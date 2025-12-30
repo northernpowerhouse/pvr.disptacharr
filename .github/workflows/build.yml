@@ -24,12 +24,12 @@ jobs:
       - name: Setup CMake
         uses: lukka/get-cmake@latest
 
-      # 4. Link addon to Kodi build system
+      # 4. Copy addon to Kodi build system location
       - name: Setup Addon Location
         shell: bash
         run: |
           mkdir -p kodi/cmake/addons/addons
-          ln -s $PWD/addon kodi/cmake/addons/addons/pvr.dispatcharr
+          cp -r addon kodi/cmake/addons/addons/pvr.dispatcharr
 
       # 5. Configure Build (The "Superbuild" Method)
       - name: Configure CMake
