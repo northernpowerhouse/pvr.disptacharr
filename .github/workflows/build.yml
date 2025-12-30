@@ -41,9 +41,10 @@ jobs:
           cd build
           cmake -G "Visual Studio 17 2022" -A x64 \
             -DADDONS_TO_BUILD=pvr.dispatcharr \
+            -DADDON_SRC_PREFIX="${ROOT}" \
             -DADDONS_DEFINITION_DIR="${ROOT}/addon-defs" \
             -DCMAKE_BUILD_TYPE=Release \
-            -DCMAKE_INSTALL_PREFIX=../kodi/addons \
+            -DCMAKE_INSTALL_PREFIX="${ROOT}/output" \
             -DPACKAGE_ZIP=1 \
             ../kodi/cmake/addons
 
@@ -54,9 +55,23 @@ jobs:
           cd build
           cmake --build . --config Release
 
-      # 7. Upload Artifact
+      # 7. List generated files to find artifact location
+      - name: List Build Output
+        shell: bash
+        run: |
+          echo "=== Listing build directory ==="
+          find build -name "*.zip" 2>/dev/null || echo "No zips in build/"
+          echo "=== Listing output directory ==="
+          find output -name "*.zip" 2>/dev/null || echo "No zips in output/"
+          echo "=== Listing all zips ==="
+          find . -name "*.zip" 2>/dev/null || echo "No zips found anywhere"
+
+      # 8. Upload Artifact
       - name: Upload Addon ZIP
         uses: actions/upload-artifact@v4
         with:
           name: K21-Windows-Addon
-          path: build/*.zip
+          path: |
+            build/**/*.zip
+            output/**/*.zip
+          if-no-files-found: warn
