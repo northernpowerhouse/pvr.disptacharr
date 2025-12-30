@@ -59,23 +59,21 @@ jobs:
 
       # 6b. Manual ZIP creation from output
       - name: Package Addon Manually
-        shell: bash
+        shell: pwsh
         run: |
-          echo "Checking for built addon files..."
-          if [ -d "output/pvr.dispatcharr" ]; then
-            echo "Found addon in output/pvr.dispatcharr"
-            ls -la output/pvr.dispatcharr/
-            mkdir -p artifacts
-            cd output
-            # Create ZIP with addon.xml and binary
-            zip -r ../artifacts/pvr.dispatcharr.zip pvr.dispatcharr/
-            cd ..
-            echo "Created artifacts/pvr.dispatcharr.zip"
-            ls -lh artifacts/
-          else
-            echo "ERROR: output/pvr.dispatcharr not found"
-            find output -type f 2>/dev/null | head -20 || echo "Output directory not found"
-          fi
+          Write-Host "Checking for built addon files..."
+          if (Test-Path "output/pvr.dispatcharr") {
+            Write-Host "Found addon in output/pvr.dispatcharr"
+            Get-ChildItem -Path "output/pvr.dispatcharr"
+            New-Item -ItemType Directory -Path "artifacts" -Force | Out-Null
+            Write-Host "Creating ZIP file..."
+            Compress-Archive -Path "output/pvr.dispatcharr" -DestinationPath "artifacts/pvr.dispatcharr.zip" -Force
+            Write-Host "Created artifacts/pvr.dispatcharr.zip"
+            Get-ChildItem -Path "artifacts/" -Force
+          } else {
+            Write-Host "ERROR: output/pvr.dispatcharr not found"
+            Get-ChildItem -Path "output" -Recurse | Select-Object -First 20
+          }
 
       # 7. Detailed Build Output Inspection
       - name: List All Generated Files
