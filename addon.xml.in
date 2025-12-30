@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<addon
+    id="pvr.dispatcharr"
+    version="21.0.0"
+    name="Dispatcharr PVR Client"
+    provider-name="Dispatcharr Team">
+    <requires>
+        <import addon="xbmc.pvr" minversion="8.2.0"/>
+    </requires>
+    <extension
+        point="xbmc.pvrclient"
+        library_@PLATFORM@="@LIBRARY_NAME@"/>
+    <extension point="xbmc.addon.metadata">
+        <summary>PVR addon for Dispatcharr middleware</summary>
+        <description>
+            This addon provides integration between Kodi and the Dispatcharr middleware,
+            enabling access to live TV channels, EPG data, recordings, and VOD content.
+        </description>
+        <disclaimer>This addon is still in development. Features may be incomplete.</disclaimer>
+        <license>GPL-2.0-only</license>
+        <platform>all</platform>
+        <reuselanguageinvoker>false</reuselanguageinvoker>
+    </extension>
+</addon>

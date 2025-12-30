@@ -1,0 +1,20 @@
+# Dispatcharr String Resources (English)
+
+# Category labels
+30000=General
+30001=Connection Settings
+30002=Catchup Settings
+
+# Connection Setting Labels
+30010=Backend URL
+30011=The base URL of your Dispatcharr middleware instance (e.g., http://localhost:9191)
+30012=Username
+30013=Your Dispatcharr account username
+30014=Password
+30015=Your Dispatcharr account password
+30016=API Token
+30017=JWT API token (optional, auto-populated after login)
+
+# Catchup Settings
+30018=Catchup Window (Days)
+30019=Number of days of catchup data to support (1-30 days)

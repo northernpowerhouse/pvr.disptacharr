@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<settings version="2">
+    <category label="30000">
+        <group label="30001">
+            <setting id="backend_url" type="string" label="30010" default="http://localhost:9191">
+                <level>0</level>
+                <help>30011</help>
+            </setting>
+            <setting id="username" type="string" label="30012" default="">
+                <level>0</level>
+                <help>30013</help>
+            </setting>
+            <setting id="password" type="string" label="30014" default="" option="hidden">
+                <level>0</level>
+                <help>30015</help>
+            </setting>
+            <setting id="api_token" type="string" label="30016" default="" option="hidden">
+                <level>2</level>
+                <help>30017</help>
+            </setting>
+        </group>
+        <group label="30002">
+            <setting id="catchup_window" type="integer" label="30018" default="3" min="1" max="30">
+                <level>0</level>
+                <help>30019</help>
+            </setting>
+        </group>
+    </category>
+</settings>
