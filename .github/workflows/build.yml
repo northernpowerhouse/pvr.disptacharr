@@ -72,15 +72,15 @@ jobs:
             # Create ZIP: the compression path should be just the folder name
             # This way the ZIP will contain pvr.dispatcharr/ at root
             Push-Location output
-            Compress-Archive -Path "pvr.dispatcharr" -DestinationPath "../pvr.dispatcharr-k21-windows.zip" -Force
+            Compress-Archive -Path "pvr.dispatcharr" -DestinationPath "../K21-Windows-Addon.zip" -Force
             Pop-Location
             
-            Write-Host "Created pvr.dispatcharr-k21-windows.zip"
-            Get-ChildItem -Path "pvr.dispatcharr-k21-windows.zip"
+            Write-Host "Created K21-Windows-Addon.zip"
+            Get-ChildItem -Path "K21-Windows-Addon.zip"
             
             # Verify ZIP structure
             Write-Host "Verifying ZIP structure..."
-            $zipContent = Expand-Archive -Path "pvr.dispatcharr-k21-windows.zip" -DestinationPath "zip_test" -PassThru
+            $zipContent = Expand-Archive -Path "K21-Windows-Addon.zip" -DestinationPath "zip_test" -PassThru
             Write-Host "ZIP root contents:"
             Get-ChildItem -Path "zip_test"
           } else {
@@ -116,5 +116,5 @@ jobs:
         with:
           name: K21-Windows-Addon
           path: |
-            pvr.dispatcharr-k21-windows.zip
+            K21-Windows-Addon.zip
           if-no-files-found: warn
