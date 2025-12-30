@@ -16,5 +16,8 @@ set(HEADERS
 # Create addon binary
 add_library(pvr.dispatcharr MODULE ${SOURCES} ${HEADERS})
 
+# Include Kodi headers
+target_include_directories(pvr.dispatcharr PRIVATE ${KODI_INCLUDE_DIR})
+
 # Link against Kodi
 target_link_libraries(pvr.dispatcharr ${KODI_LIBRARIES})
