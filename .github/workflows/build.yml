@@ -55,16 +55,50 @@ jobs:
           cd build
           cmake --build . --config Release
 
-      # 7. List generated files to find artifact location
-      - name: List Build Output
+      # 6b. Manual ZIP creation if addon was built
+      - name: Package Addon Manually
         shell: bash
         run: |
-          echo "=== Listing build directory ==="
-          find build -name "*.zip" 2>/dev/null || echo "No zips in build/"
-          echo "=== Listing output directory ==="
-          find output -name "*.zip" 2>/dev/null || echo "No zips in output/"
-          echo "=== Listing all zips ==="
-          find . -name "*.zip" 2>/dev/null || echo "No zips found anywhere"
+          if [ -d "build/addons/pvr.dispatcharr" ]; then
+            echo "Found built addon in build/addons/pvr.dispatcharr"
+            mkdir -p artifacts
+            cd build/addons
+            zip -r ../../artifacts/pvr.dispatcharr.zip pvr.dispatcharr/
+            cd ../..
+            echo "Created artifacts/pvr.dispatcharr.zip"
+          elif [ -d "output/addons/pvr.dispatcharr" ]; then
+            echo "Found built addon in output/addons/pvr.dispatcharr"
+            mkdir -p artifacts
+            cd output/addons
+            zip -r ../../artifacts/pvr.dispatcharr.zip pvr.dispatcharr/
+            cd ../..
+            echo "Created artifacts/pvr.dispatcharr.zip"
+          else
+            echo "ERROR: No addon build directory found!"
+            find . -type d -name "pvr.dispatcharr" 2>/dev/null || echo "No pvr.dispatcharr directory found"
+          fi
+
+      # 7. Detailed Build Output Inspection
+      - name: List All Generated Files
+        shell: bash
+        run: |
+          echo "=== Current working directory ==="
+          pwd
+          echo ""
+          echo "=== Directory tree (limited to 3 levels) ==="
+          find . -maxdepth 3 -type f -name "*dispatcharr*" 2>/dev/null || echo "No dispatcharr files found"
+          echo ""
+          echo "=== All .zip files anywhere ==="
+          find . -name "*.zip" 2>/dev/null | head -20 || echo "No zip files found"
+          echo ""
+          echo "=== Build directory contents ==="
+          ls -la build/ 2>/dev/null | head -30 || echo "Build directory not found"
+          echo ""
+          echo "=== Contents of build/addons ==="
+          ls -laR build/addons 2>/dev/null || echo "No build/addons directory"
+          echo ""
+          echo "=== CMake build log (last 50 lines) ==="
+          tail -50 build/CMakeFiles/CMakeOutput.log 2>/dev/null || echo "No CMake output log"
 
       # 8. Upload Artifact
       - name: Upload Addon ZIP
@@ -72,6 +106,8 @@ jobs:
         with:
           name: K21-Windows-Addon
           path: |
+            artifacts/*.zip
             build/**/*.zip
             output/**/*.zip
+            *.zip
           if-no-files-found: warn
