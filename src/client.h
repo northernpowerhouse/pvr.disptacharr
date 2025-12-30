@@ -1,8 +1,7 @@
 #pragma once
 
 #include <kodi/addon-instance/PVR.h>
-#include <kodi/network/Network.h>
-#include <rapidjson/document.h>
+#include <kodi/Filesystem.h>
 #include <string>
 #include <vector>
 #include <map>
@@ -22,43 +21,34 @@ public:
 
     // Channels
     PVR_ERROR GetChannelsAmount(int& amount) override;
-    PVR_ERROR GetChannels(kodi::addon::PVRChannelsResult& results) override;
-
-    // Stream URL & Catchup
-    PVR_ERROR GetStreamURL(const kodi::addon::PVRStreamProperties& properties,
-                           std::string& streamURL) override;
+    PVR_ERROR GetChannels(bool radio, kodi::addon::PVRChannelsResultSet& results) override;
 
     // Recordings
     PVR_ERROR GetRecordingsAmount(bool deleted, int& amount) override;
-    PVR_ERROR GetRecordings(bool deleted, kodi::addon::PVRRecordingsResult& results) override;
+    PVR_ERROR GetRecordings(bool deleted, kodi::addon::PVRRecordingsResultSet& results) override;
 
     // Timers
     PVR_ERROR GetTimersAmount(int& amount) override;
-    PVR_ERROR GetTimers(kodi::addon::PVRTimersResult& results) override;
+    PVR_ERROR GetTimers(kodi::addon::PVRTimersResultSet& results) override;
     PVR_ERROR AddTimer(const kodi::addon::PVRTimer& timer) override;
 
-    // EPG (stub)
+    // EPG
     PVR_ERROR GetEPGForChannel(int channelUid, time_t start, time_t end,
-                               kodi::addon::PVREPGTagsResult& results) override;
+                               kodi::addon::PVREPGTagsResultSet& results) override;
 
 private:
     // Helper methods
-    PVR_ERROR FetchChannels();
-    PVR_ERROR FetchRecordings();
+    void FetchChannels();
     std::string GetSetting(const std::string& settingId);
-    bool AuthenticateAPI();
-    std::string GetAuthToken();
-    bool ParseChannelJSON(const rapidjson::Value& channelObj, kodi::addon::PVRChannel& channel);
     std::string BuildCatchupURL(const std::string& channelId, time_t startTime, time_t endTime);
     std::string FormatTimeForCatchup(time_t timestamp);
 
-    // HTTP helper
-    std::string MakeHTTPRequest(const std::string& url, bool useAuth = true);
+    // HTTP helper using Kodi VFS
+    std::string MakeHTTPRequest(const std::string& url);
 
     // Data containers
     std::vector<kodi::addon::PVRChannel> m_channels;
-    std::vector<kodi::addon::PVRRecording> m_recordings;
-    std::map<std::string, std::string> m_channelIdMap; // Map channel ID to Kodi channel number
+    std::map<int, std::string> m_channelIdMap;
 
     // Settings cache
     std::string m_backendURL;
