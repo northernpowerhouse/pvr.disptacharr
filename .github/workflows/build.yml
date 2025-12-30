@@ -65,11 +65,24 @@ jobs:
           if (Test-Path "output/pvr.dispatcharr") {
             Write-Host "Found addon in output/pvr.dispatcharr"
             Get-ChildItem -Path "output/pvr.dispatcharr"
-            New-Item -ItemType Directory -Path "artifacts" -Force | Out-Null
-            Write-Host "Creating ZIP file..."
-            Compress-Archive -Path "output/pvr.dispatcharr" -DestinationPath "artifacts/pvr.dispatcharr.zip" -Force
-            Write-Host "Created artifacts/pvr.dispatcharr.zip"
-            Get-ChildItem -Path "artifacts/" -Force
+            
+            Write-Host "Creating ZIP file with correct Kodi structure..."
+            Write-Host "ZIP should have pvr.dispatcharr/ at root level"
+            
+            # Create ZIP: the compression path should be just the folder name
+            # This way the ZIP will contain pvr.dispatcharr/ at root
+            Push-Location output
+            Compress-Archive -Path "pvr.dispatcharr" -DestinationPath "../pvr.dispatcharr-k21-windows.zip" -Force
+            Pop-Location
+            
+            Write-Host "Created pvr.dispatcharr-k21-windows.zip"
+            Get-ChildItem -Path "pvr.dispatcharr-k21-windows.zip"
+            
+            # Verify ZIP structure
+            Write-Host "Verifying ZIP structure..."
+            $zipContent = Expand-Archive -Path "pvr.dispatcharr-k21-windows.zip" -DestinationPath "zip_test" -PassThru
+            Write-Host "ZIP root contents:"
+            Get-ChildItem -Path "zip_test"
           } else {
             Write-Host "ERROR: output/pvr.dispatcharr not found"
             Get-ChildItem -Path "output" -Recurse | Select-Object -First 20
@@ -103,8 +116,5 @@ jobs:
         with:
           name: K21-Windows-Addon
           path: |
-            artifacts/*.zip
-            build/**/*.zip
-            output/**/*.zip
-            *.zip
+            pvr.dispatcharr-k21-windows.zip
           if-no-files-found: warn
