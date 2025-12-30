@@ -4,6 +4,9 @@ project(pvr.dispatcharr)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+# Find Kodi - required for headers and linking
+find_package(Kodi REQUIRED)
+
 # Main addon sources
 set(SOURCES
     src/client.cpp
