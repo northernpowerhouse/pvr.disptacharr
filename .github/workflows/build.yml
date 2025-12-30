@@ -53,7 +53,7 @@ jobs:
       run: |
         make -C ${app_id}/build -j$(getconf _NPROCESSORS_ONLN)
     - name: Upload artifact
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: Kodi-Addon-Linux-${{ matrix.name }}
         path: ${{ github.workspace }}/${{ env.app_id }}/build/addon
@@ -103,7 +103,7 @@ jobs:
       run: |
         cmake --build "${{ env.app_id }}/build" --config Release --parallel
     - name: Upload artifact
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: Kodi-Addon-Windows-${{ matrix.arch }}
         path: ${{ github.workspace }}/${{ env.app_id }}/build/addon
