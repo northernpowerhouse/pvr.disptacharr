@@ -54,28 +54,27 @@ jobs:
         run: |
           cd build
           cmake --build . --config Release
+          echo "Build completed. Now packaging addon..."
+          cmake --build . --config Release --target package-pvr.dispatcharr
 
-      # 6b. Manual ZIP creation if addon was built
+      # 6b. Manual ZIP creation from output
       - name: Package Addon Manually
         shell: bash
         run: |
-          if [ -d "build/addons/pvr.dispatcharr" ]; then
-            echo "Found built addon in build/addons/pvr.dispatcharr"
+          echo "Checking for built addon files..."
+          if [ -d "output/pvr.dispatcharr" ]; then
+            echo "Found addon in output/pvr.dispatcharr"
+            ls -la output/pvr.dispatcharr/
             mkdir -p artifacts
-            cd build/addons
-            zip -r ../../artifacts/pvr.dispatcharr.zip pvr.dispatcharr/
-            cd ../..
+            cd output
+            # Create ZIP with addon.xml and binary
+            zip -r ../artifacts/pvr.dispatcharr.zip pvr.dispatcharr/
+            cd ..
             echo "Created artifacts/pvr.dispatcharr.zip"
-          elif [ -d "output/addons/pvr.dispatcharr" ]; then
-            echo "Found built addon in output/addons/pvr.dispatcharr"
-            mkdir -p artifacts
-            cd output/addons
-            zip -r ../../artifacts/pvr.dispatcharr.zip pvr.dispatcharr/
-            cd ../..
-            echo "Created artifacts/pvr.dispatcharr.zip"
+            ls -lh artifacts/
           else
-            echo "ERROR: No addon build directory found!"
-            find . -type d -name "pvr.dispatcharr" 2>/dev/null || echo "No pvr.dispatcharr directory found"
+            echo "ERROR: output/pvr.dispatcharr not found"
+            find output -type f 2>/dev/null | head -20 || echo "Output directory not found"
           fi
 
       # 7. Detailed Build Output Inspection
