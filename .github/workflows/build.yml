@@ -24,21 +24,23 @@ jobs:
       - name: Setup CMake
         uses: lukka/get-cmake@latest
 
-      # 4. Copy addon to Kodi build system location
-      - name: Setup Addon Location
+      # 4. Prepare addon definition for local source
+      - name: Setup Addon Definition
         shell: bash
         run: |
-          mkdir -p kodi/cmake/addons/addons
-          cp -r addon kodi/cmake/addons/addons/pvr.dispatcharr
+          mkdir -p addon-defs/pvr.dispatcharr
+          echo "pvr.dispatcharr file://${PWD}/addon" > addon-defs/pvr.dispatcharr/pvr.dispatcharr.txt
 
       # 5. Configure Build (The "Superbuild" Method)
       - name: Configure CMake
         shell: bash
         run: |
+          ROOT=$(pwd)
           mkdir build
           cd build
           cmake -G "Visual Studio 17 2022" -A x64 \
             -DADDONS_TO_BUILD=pvr.dispatcharr \
+            -DADDONS_DEFINITION_DIR="${ROOT}/addon-defs" \
             -DCMAKE_BUILD_TYPE=Release \
             -DCMAKE_INSTALL_PREFIX=../kodi/addons \
             -DPACKAGE_ZIP=1 \
