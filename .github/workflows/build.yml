@@ -29,7 +29,8 @@ jobs:
         shell: bash
         run: |
           mkdir -p addon-defs/pvr.dispatcharr
-          echo "pvr.dispatcharr file://${PWD}/addon" > addon-defs/pvr.dispatcharr/pvr.dispatcharr.txt
+          ADDON_PATH=$(cygpath -m "$PWD/addon")
+          echo "pvr.dispatcharr file:///${ADDON_PATH}" > addon-defs/pvr.dispatcharr/pvr.dispatcharr.txt
 
       # 5. Configure Build (The "Superbuild" Method)
       - name: Configure CMake
