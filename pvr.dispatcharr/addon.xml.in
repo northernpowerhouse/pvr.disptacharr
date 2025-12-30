@@ -4,9 +4,7 @@
     version="21.0.0"
     name="Dispatcharr PVR Client"
     provider-name="Dispatcharr Team">
-    <requires>
-        <import addon="xbmc.pvr" minversion="8.2.0"/>
-    </requires>
+    <requires>@ADDON_DEPENDS@
     <extension
         point="xbmc.pvrclient"
         library_@PLATFORM@="@LIBRARY_NAME@"/>
