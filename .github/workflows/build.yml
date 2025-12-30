@@ -24,7 +24,14 @@ jobs:
       - name: Setup CMake
         uses: lukka/get-cmake@latest
 
-      # 4. Configure Build (The "Superbuild" Method)
+      # 4. Link addon to Kodi build system
+      - name: Setup Addon Location
+        shell: bash
+        run: |
+          mkdir -p kodi/cmake/addons/addons
+          ln -s $PWD/addon kodi/cmake/addons/addons/pvr.dispatcharr
+
+      # 5. Configure Build (The "Superbuild" Method)
       - name: Configure CMake
         shell: bash
         run: |
@@ -37,14 +44,14 @@ jobs:
             -DPACKAGE_ZIP=1 \
             ../kodi/cmake/addons
 
-      # 5. Compile and Package
+      # 6. Compile and Package
       - name: Build
         shell: bash
         run: |
           cd build
           cmake --build . --config Release
 
-      # 6. Upload Artifact
+      # 7. Upload Artifact
       - name: Upload Addon ZIP
         uses: actions/upload-artifact@v4
         with:
