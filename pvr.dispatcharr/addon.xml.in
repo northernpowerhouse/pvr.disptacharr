@@ -6,6 +6,7 @@
     provider-name="Dispatcharr Team">
     <requires>
         <import addon="xbmc.pvr" minversion="8.2.0"/>
+        @ADDON_DEPENDS@
     </requires>
     <extension
         point="xbmc.pvrclient"
