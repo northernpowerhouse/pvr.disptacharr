@@ -1,0 +1,7 @@
+v21.0.0
+- Initial release for Kodi 21 (Omega)
+- Dispatcharr middleware integration
+- Live TV channel support
+- EPG data integration
+- Catchup/timeshift functionality
+- Recordings and VOD support
