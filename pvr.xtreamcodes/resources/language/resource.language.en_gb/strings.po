@@ -1,0 +1,102 @@
+msgid ""
+msgstr ""
+"Content-Type: text/plain; charset=UTF-8\n"
+
+msgctxt "#30000"
+msgid "Connection"
+msgstr "Connection"
+
+msgctxt "#30001"
+msgid "Server"
+msgstr "Server"
+
+msgctxt "#30002"
+msgid "Port"
+msgstr "Port"
+
+msgctxt "#30003"
+msgid "Username"
+msgstr "Username"
+
+
+msgctxt "#30004"
+msgid "Password"
+msgstr "Password"
+
+msgctxt "#30005"
+msgid "Request timeout (seconds)"
+msgstr "Request timeout (seconds)"
+
+
+msgctxt "#30100"
+msgid "Streaming"
+msgstr "Streaming"
+
+msgctxt "#30101"
+msgid "Stream format"
+msgstr "Stream format"
+
+msgctxt "#30102"
+msgid "MPEG-TS"
+msgstr "MPEG-TS"
+
+msgctxt "#30103"
+msgid "HLS (m3u8)"
+msgstr "HLS (m3u8)"
+
+msgctxt "#30104"
+msgid "Channel numbering"
+msgstr "Channel numbering"
+
+msgctxt "#30105"
+msgid "Use provider numbering"
+msgstr "Use provider numbering"
+
+msgctxt "#30106"
+msgid "Sequential numbering"
+msgstr "Sequential numbering"
+
+msgctxt "#30200"
+msgid "Filters"
+msgstr "Filters"
+
+msgctxt "#30201"
+msgid "Channel filter patterns (comma-separated; supports '*')"
+msgstr "Channel filter patterns (comma-separated; supports '*')"
+
+msgctxt "#30202"
+msgid "Category filter mode"
+msgstr "Category filter mode"
+
+msgctxt "#30203"
+msgid "All categories"
+msgstr "All categories"
+
+msgctxt "#30204"
+msgid "Include only matching categories"
+msgstr "Include only matching categories"
+
+msgctxt "#30205"
+msgid "Exclude matching categories"
+msgstr "Exclude matching categories"
+
+msgctxt "#30206"
+msgid "Category filter patterns (comma-separated; supports '*')"
+msgstr "Category filter patterns (comma-separated; supports '*')"
+
+msgctxt "#30208"
+msgid "Hide channel separators (####)"
+msgstr "Hide channel separators (####)"
+
+
+msgctxt "#30400"
+msgid "User Agent"
+msgstr "User Agent"
+
+msgctxt "#30401"
+msgid "Enable user agent spoofing"
+msgstr "Enable user agent spoofing"
+
+msgctxt "#30402"
+msgid "Custom user agent"
+msgstr "Custom user agent"

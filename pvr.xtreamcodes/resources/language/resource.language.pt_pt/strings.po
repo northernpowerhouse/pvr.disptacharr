@@ -1,0 +1,104 @@
+msgid ""
+msgstr ""
+"Project-Id-Version: pvr.xtreamcodes\n"
+"Language: pt_PT\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+
+msgctxt "#30000"
+msgid "Connection"
+msgstr "Ligação"
+
+msgctxt "#30001"
+msgid "Server"
+msgstr "Servidor"
+
+msgctxt "#30002"
+msgid "Port"
+msgstr "Porta"
+
+msgctxt "#30003"
+msgid "Username"
+msgstr "Nome de utilizador"
+
+msgctxt "#30004"
+msgid "Password"
+msgstr "Palavra-passe"
+
+msgctxt "#30005"
+msgid "Request timeout (seconds)"
+msgstr "Tempo limite do pedido (segundos)"
+
+msgctxt "#30100"
+msgid "Streaming"
+msgstr "Transmissão"
+
+msgctxt "#30101"
+msgid "Stream format"
+msgstr "Formato de transmissão"
+
+msgctxt "#30102"
+msgid "MPEG-TS"
+msgstr "MPEG-TS"
+
+msgctxt "#30103"
+msgid "HLS (m3u8)"
+msgstr "HLS (m3u8)"
+
+msgctxt "#30104"
+msgid "Channel numbering"
+msgstr "Numeração de canais"
+
+msgctxt "#30105"
+msgid "Use provider numbering"
+msgstr "Usar numeração do fornecedor"
+
+msgctxt "#30106"
+msgid "Sequential numbering"
+msgstr "Numeração sequencial"
+
+msgctxt "#30200"
+msgid "Filters"
+msgstr "Filtros"
+
+msgctxt "#30201"
+msgid "Channel filter patterns (comma-separated; supports '*')"
+msgstr "Filtro de canais (separados por vírgulas; suporta '*')"
+
+msgctxt "#30202"
+msgid "Category filter mode"
+msgstr "Modo de filtro de categorias"
+
+msgctxt "#30203"
+msgid "All categories"
+msgstr "Todas as categorias"
+
+msgctxt "#30204"
+msgid "Include only matching categories"
+msgstr "Incluir apenas categorias correspondentes"
+
+msgctxt "#30205"
+msgid "Exclude matching categories"
+msgstr "Excluir categorias correspondentes"
+
+msgctxt "#30206"
+msgid "Category filter patterns (comma-separated; supports '*')"
+msgstr "Filtro de categorias (separados por vírgulas; suporta '*')"
+
+msgctxt "#30208"
+msgid "Hide channel separators (####)"
+msgstr "Ocultar separadores de canais (####)"
+
+msgctxt "#30400"
+msgid "User Agent"
+msgstr "Agente de utilizador"
+
+msgctxt "#30401"
+msgid "Enable user agent spoofing"
+msgstr "Ativar mascaramento do agente de utilizador"
+
+msgctxt "#30402"
+msgid "Custom user agent"
+msgstr "Agente de utilizador personalizado"

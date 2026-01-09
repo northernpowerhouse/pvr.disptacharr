@@ -1,0 +1,236 @@
+name: Release Zips
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-desktop:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-22.04
+            label: linux
+          - os: macos-14
+            label: macos
+            arch: arm64
+          - os: macos-14
+            label: macos
+            arch: x86_64
+    name: Build ${{ matrix.label }}${{ matrix.arch && format(' ({0})', matrix.arch) || '' }}
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Fetch Kodi dev kit (headers)
+        shell: bash
+        run: |
+          git clone --depth 1 --branch 21.3-Omega https://github.com/xbmc/xbmc xbmc
+          if [[ ! -f "xbmc/xbmc/addons/kodi-dev-kit/include/kodi/addon-instance/PVR.h" ]]; then
+            echo "ERROR: Could not find kodi-dev-kit/include/kodi/addon-instance/PVR.h"
+            exit 1
+          fi
+
+      - name: Install build deps (Linux)
+        if: startsWith(matrix.os, 'ubuntu')
+        timeout-minutes: 15
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y cmake build-essential zip g++ 2>&1 | tail -20
+          echo "Build dependencies installed successfully"
+
+
+      - name: Build and stage addon
+        shell: bash
+        timeout-minutes: 45
+        env:
+          KODI_ADDON_SDK: xbmc/xbmc/addons/kodi-dev-kit
+          ARCH: ${{ matrix.arch }}
+          VERSION: ${{ github.event_name == 'release' && github.event.release.tag_name || '' }}
+        run: |
+          echo "KODI_ADDON_SDK=$KODI_ADDON_SDK"
+          ls -la "$KODI_ADDON_SDK/include/kodi/addon-instance/" || true
+          if [[ -n "$VERSION" ]]; then
+            VERSION="${VERSION#v}"  # Strip 'v' prefix
+            ./build.sh --skip-zip --version "$VERSION" 2>&1
+          else
+            ./build.sh --skip-zip 2>&1
+          fi
+          ls -lah dist
+
+
+      - name: Check shared library deps (Linux)
+        if: startsWith(matrix.os, 'ubuntu')
+        shell: bash
+        run: |
+          set -e
+          ADDON_DIR="dist/pvr.xtreamcodes"
+          if [[ ! -d "$ADDON_DIR" ]]; then echo "Addon directory not found: $ADDON_DIR"; ls -lah dist || true; exit 1; fi
+          SO_FILE=$(find "$ADDON_DIR" -name '*.so' -print -quit)
+          if [[ -z "$SO_FILE" ]]; then echo "No .so found in $ADDON_DIR"; find "$ADDON_DIR" -maxdepth 2 -type f -print; exit 1; fi
+          echo "Found SO: $SO_FILE"
+          ldd "$SO_FILE" | tee /dev/stderr
+          if ldd "$SO_FILE" | grep -q "not found"; then echo "Missing shared dependencies"; exit 1; fi
+          echo "Linux shared library dependencies OK"
+
+      - name: Check shared library deps (macOS)
+        if: startsWith(matrix.os, 'macos')
+        shell: bash
+        env:
+          ARCH: ${{ matrix.arch }}
+        run: |
+          set -e
+          ADDON_DIR="dist/pvr.xtreamcodes"
+          if [[ ! -d "$ADDON_DIR" ]]; then echo "Addon directory not found: $ADDON_DIR"; ls -lah dist || true; exit 1; fi
+          DYLIB_FILE=$(find "$ADDON_DIR" -name '*.dylib' -print -quit)
+          if [[ -z "$DYLIB_FILE" ]]; then echo "No .dylib found in $ADDON_DIR"; find "$ADDON_DIR" -maxdepth 2 -type f -print; exit 1; fi
+          echo "Found DYLIB: $DYLIB_FILE"
+          file "$DYLIB_FILE" | tee /dev/stderr
+          if [[ "$ARCH" == "arm64" ]]; then file "$DYLIB_FILE" | grep -qi 'arm64' || { echo "Expected arm64 binary"; exit 1; }; fi
+          if [[ "$ARCH" == "x86_64" ]]; then file "$DYLIB_FILE" | grep -qi 'x86_64' || { echo "Expected x86_64 binary"; exit 1; }; fi
+          otool -L "$DYLIB_FILE" | tee /dev/stderr
+          echo "macOS binary architecture and dependencies listed"
+
+      - name: Set version
+        id: version
+        shell: bash
+        run: |
+          if [[ "${{ github.event_name }}" == "release" ]]; then
+            VERSION="${{ github.event.release.tag_name }}"
+            VERSION="${VERSION#v}"  # Strip 'v' prefix if present
+          else
+            VERSION="dev"
+          fi
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Using version: $VERSION"
+
+      - name: Create release ZIP
+        if: github.event_name == 'release'
+        shell: bash
+        env:
+          MATRIX_OS: ${{ matrix.os }}
+          MAC_ARCH: ${{ matrix.arch }}
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          set -e
+          case "$MATRIX_OS" in
+            ubuntu-*) PLAT=linux ;;
+            macos-*)  PLAT=macos ;;
+            *) PLAT="$MATRIX_OS" ;;
+          esac
+          if [[ "$PLAT" == "macos" && -n "${MAC_ARCH}" ]]; then
+            PLAT="macos-${MAC_ARCH}"
+          fi
+          ZIP_NAME="pvr.xtreamcodes-${VERSION}-${PLAT}.zip"
+          (cd dist && zip -qr "$ZIP_NAME" pvr.xtreamcodes)
+          echo "Created release ZIP: $ZIP_NAME"
+          ls -lah dist/*.zip
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: pvr.xtreamcodes-${{ steps.version.outputs.version }}-${{ matrix.label }}${{ matrix.arch && format('-{0}', matrix.arch) || '' }}
+          path: dist/*
+
+      - name: Publish GitHub Release asset
+        if: github.event_name == 'release'
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*.zip
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  build-android:
+    name: Build Android (${{ matrix.abi }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        abi: [arm64-v8a, armeabi-v7a, x86_64]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Fetch Kodi dev kit (headers)
+        shell: bash
+        run: |
+          git clone --depth 1 --branch 21.3-Omega https://github.com/xbmc/xbmc xbmc
+          if [[ ! -f "xbmc/xbmc/addons/kodi-dev-kit/include/kodi/addon-instance/PVR.h" ]]; then
+            echo "ERROR: Could not find kodi-dev-kit/include/kodi/addon-instance/PVR.h"
+            exit 1
+          fi
+
+      - name: Set up NDK
+        timeout-minutes: 20
+        uses: nttld/setup-ndk@v1
+        id: setup-ndk
+        with:
+          ndk-version: r26d
+
+      - name: Build addon (Android)
+        timeout-minutes: 45
+        env:
+          KODI_ADDON_SDK: xbmc/xbmc/addons/kodi-dev-kit
+          VERSION: ${{ github.event_name == 'release' && github.event.release.tag_name || '' }}
+        run: |
+          echo "ANDROID_NDK_ROOT=$ANDROID_NDK_ROOT"
+          echo "ANDROID_NDK_HOME=$ANDROID_NDK_HOME"
+          ls -la "$ANDROID_NDK_ROOT/build/cmake/android.toolchain.cmake" || ls -la "$ANDROID_NDK_HOME/build/cmake/android.toolchain.cmake" || find /usr/local -name "android.toolchain.cmake" 2>/dev/null | head -1
+          NDK_PATH="${ANDROID_NDK_ROOT:-${ANDROID_NDK_HOME}}"
+          if [ -z "$NDK_PATH" ]; then
+            echo "ERROR: NDK not found"
+            exit 1
+          fi
+          export CMAKE_EXTRA_ARGS="-DCMAKE_TOOLCHAIN_FILE=$NDK_PATH/build/cmake/android.toolchain.cmake -DANDROID_ABI=${{ matrix.abi }} -DANDROID_PLATFORM=android-21"
+          if [[ -n "$VERSION" ]]; then
+            VERSION="${VERSION#v}"  # Strip 'v' prefix
+            ./build.sh --skip-zip --version "$VERSION"
+          else
+            ./build.sh --skip-zip
+          fi
+          ls -lah dist
+
+      - name: Set version
+        id: version
+        run: |
+          if [[ "${{ github.event_name }}" == "release" ]]; then
+            VERSION="${{ github.event.release.tag_name }}"
+            VERSION="${VERSION#v}"  # Strip 'v' prefix if present
+          else
+            VERSION="dev"
+          fi
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Using version: $VERSION"
+
+      - name: Create release ZIP
+        if: github.event_name == 'release'
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          set -e
+          ZIP_NAME="pvr.xtreamcodes-${VERSION}-android-${{ matrix.abi }}.zip"
+          (cd dist && zip -qr "$ZIP_NAME" pvr.xtreamcodes)
+          echo "Created release ZIP: $ZIP_NAME"
+          ls -lah dist/*.zip
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: pvr.xtreamcodes-${{ steps.version.outputs.version }}-android-${{ matrix.abi }}
+          path: dist/*
+
+      - name: Publish GitHub Release asset
+        if: github.event_name == 'release'
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*.zip
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

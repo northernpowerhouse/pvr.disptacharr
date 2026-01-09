@@ -1,0 +1,167 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<settings version="1">
+  <section id="pvr.xtreamcodes">
+    <category id="connection" label="30000" help="">
+      <group id="1">
+        <setting id="server" type="string" label="30001" help="">
+          <level>0</level>
+          <default/>
+          <constraints>
+            <allowempty>true</allowempty>
+          </constraints>
+          <control type="edit" format="string" delayed="false">
+            <heading>30001</heading>
+          </control>
+        </setting>
+        <setting id="port" type="integer" label="30002" help="">
+          <level>0</level>
+          <default>80</default>
+          <constraints>
+            <minimum>1</minimum>
+            <step>1</step>
+            <maximum>65535</maximum>
+          </constraints>
+          <control type="edit" format="integer" delayed="false" />
+        </setting>
+        <setting id="username" type="string" label="30003" help="">
+          <level>0</level>
+          <default/>
+          <constraints>
+            <allowempty>true</allowempty>
+          </constraints>
+          <control type="edit" format="string" delayed="false">
+            <heading>30003</heading>
+          </control>
+        </setting>
+        <setting id="password" type="string" label="30004" help="">
+          <level>0</level>
+          <default/>
+          <constraints>
+            <allowempty>true</allowempty>
+          </constraints>
+          <control type="edit" format="string" delayed="false">
+            <heading>30004</heading>
+            <hidden>true</hidden>
+          </control>
+        </setting>
+        <setting id="timeout_seconds" type="integer" label="30005" help="">
+          <level>0</level>
+          <default>30</default>
+          <constraints>
+            <minimum>1</minimum>
+            <step>1</step>
+            <maximum>120</maximum>
+          </constraints>
+          <control type="edit" format="integer" delayed="false" />
+        </setting>
+      </group>
+    </category>
+
+    <category id="stream" label="30100" help="">
+      <group id="1">
+        <setting id="stream_format" type="string" label="30101" help="">
+          <level>0</level>
+          <default>ts</default>
+          <constraints>
+            <options>
+              <option label="30102" value="ts">ts</option>
+              <option label="30103" value="hls">hls</option>
+            </options>
+          </constraints>
+          <control type="list" format="string">
+            <heading>30101</heading>
+          </control>
+        </setting>
+        <setting id="channel_numbering" type="string" label="30104" help="">
+          <level>0</level>
+          <default>provider</default>
+          <constraints>
+            <options>
+              <option label="30105" value="provider">provider</option>
+              <option label="30106" value="sequential">sequential</option>
+            </options>
+          </constraints>
+          <control type="list" format="string">
+            <heading>30104</heading>
+          </control>
+        </setting>
+      </group>
+    </category>
+
+    <category id="filters" label="30200" help="">
+      <group id="1">
+        <setting id="channel_filter_patterns" type="string" label="30201" help="">
+          <level>0</level>
+          <default/>
+          <constraints>
+            <allowempty>true</allowempty>
+          </constraints>
+          <control type="edit" format="string" delayed="false">
+            <heading>30201</heading>
+          </control>
+        </setting>
+
+        <setting id="filter_channel_separators" type="boolean" label="30208" help="">
+          <level>0</level>
+          <default>true</default>
+          <control type="toggle" />
+        </setting>
+
+        <setting id="category_filter_mode" type="string" label="30202" help="">
+          <level>0</level>
+          <default>all</default>
+          <constraints>
+            <options>
+              <option label="30203" value="all">all</option>
+              <option label="30204" value="include">include</option>
+              <option label="30205" value="exclude">exclude</option>
+            </options>
+          </constraints>
+          <control type="list" format="string">
+            <heading>30202</heading>
+          </control>
+        </setting>
+
+        <setting id="category_filter_patterns" type="string" label="30206" help="">
+          <level>0</level>
+          <default/>
+          <constraints>
+            <allowempty>true</allowempty>
+          </constraints>
+          <dependencies>
+            <dependency type="visible">
+              <condition operator="isnot" setting="category_filter_mode">all</condition>
+            </dependency>
+          </dependencies>
+          <control type="edit" format="string" delayed="false">
+            <heading>30206</heading>
+          </control>
+        </setting>
+
+      </group>
+    </category>
+
+    <category id="useragent" label="30400" help="">
+      <group id="1">
+        <setting id="enable_user_agent_spoofing" type="boolean" label="30401" help="">
+          <level>0</level>
+          <default>false</default>
+          <control type="toggle" />
+        </setting>
+        <setting id="custom_user_agent" type="string" label="30402" help="">
+          <level>0</level>
+          <default>XtreamCodesKodiAddon</default>
+          <dependencies>
+            <dependency type="visible">
+              <condition operator="is" setting="enable_user_agent_spoofing">true</condition>
+            </dependency>
+          </dependencies>
+          <control type="edit" format="string" delayed="false">
+            <heading>30402</heading>
+          </control>
+        </setting>
+
+      </group>
+    </category>
+  </section>
+</settings>

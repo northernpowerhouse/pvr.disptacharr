@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<addon id="@ADDON_ID@" version="@ADDON_VERSION@" name="@ADDON_NAME@" provider-name="Denunciadeiro">
+  <requires>
+    <import addon="kodi.binary.instance.pvr" version="8.3.0"/>
+  </requires>
+
+  <extension
+    point="kodi.pvrclient"
+    library_osx="@ADDON_ID@.dylib"
+    library_linux="@ADDON_ID@.linux.so"
+    library_android="@ADDON_ID@.android.so"
+    />
+
+  <extension point="xbmc.addon.metadata">
+    <summary lang="en_GB">Xtream Codes PVR Client</summary>
+    <description lang="en_GB">Live TV PVR client for Xtream Codes IPTV servers.</description>
+    <license>GPL-2.0-or-later</license>
+    <assets>
+      <icon>icon.png</icon>
+    </assets>
+    <platform>all</platform>
+  </extension>
+</addon>
