@@ -1253,20 +1253,28 @@ private:
 
         // Load EPG data from XMLTV endpoint
         std::string xmltvData;
-        if (xtream::FetchXMLTVEpg(settings, xmltvData))
+        const xtream::FetchResult epgResult = xtream::FetchXMLTVEpg(settings, xmltvData);
+        if (epgResult.ok)
         {
           kodi::Log(ADDON_LOG_INFO, "pvr.xtreamcodes: fetched XMLTV EPG data");
-          std::vector<xtream::ChannelEpg> epgData = xtream::ParseXMLTV(xmltvData, streams);
-          
-          std::lock_guard<std::mutex> lock(m_mutex);
-          m_epgData = std::make_shared<std::vector<xtream::ChannelEpg>>(std::move(epgData));
-          
-          kodi::Log(ADDON_LOG_INFO, "pvr.xtreamcodes: loaded EPG for %zu channels",
-                    m_epgData ? m_epgData->size() : 0u);
+          std::vector<xtream::ChannelEpg> epgData;
+          if (xtream::ParseXMLTV(xmltvData, streams, epgData))
+          {
+            std::lock_guard<std::mutex> lock(m_mutex);
+            m_epgData = std::make_shared<std::vector<xtream::ChannelEpg>>(std::move(epgData));
+            
+            kodi::Log(ADDON_LOG_INFO, "pvr.xtreamcodes: loaded EPG for %zu channels",
+                      m_epgData ? m_epgData->size() : 0u);
+          }
+          else
+          {
+            kodi::Log(ADDON_LOG_WARNING, "pvr.xtreamcodes: failed to parse XMLTV data");
+          }
         }
         else
         {
-          kodi::Log(ADDON_LOG_WARNING, "pvr.xtreamcodes: failed to fetch XMLTV EPG data");
+          kodi::Log(ADDON_LOG_WARNING, "pvr.xtreamcodes: failed to fetch XMLTV EPG data: %s", 
+                    epgResult.details.c_str());
         }
 
         kodi::Log(ADDON_LOG_INFO,

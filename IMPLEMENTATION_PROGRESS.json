@@ -406,19 +406,31 @@
     "description": "Development and testing process for pvr.xtreamcodes",
     "steps": [
       "1. Code locally - Make changes to source files",
-      "2. Commit changes - Git commit with descriptive message",
-      "3. Push to GitHub - Push to feature branch or create tag with 'v*' prefix for releases",
-      "4. GitHub Actions builds - Automatic build for all platforms (macOS, Linux, Windows, Android ABIs)",
-      "5. Download artifacts - Get Windows and Android arm32 (armeabi-v7a) builds from GitHub Actions",
-      "6. Deploy to test devices - Copy ZIPs to /store/0arepo/ (shared directory accessible by Windows and Android devices)",
-      "7. Install and test - Install from ZIP on Windows Kodi and Android Kodi, verify functionality"
+      "2. Check syntax - Run ./scripts/check-syntax.sh to verify basic syntax (optional but recommended)",
+      "3. Commit changes - Git commit with descriptive message",
+      "4. Push to GitHub - Push to feature branch or create tag with 'v*' prefix for releases",
+      "5. GitHub Actions builds - Automatic build for all platforms (macOS, Linux, Windows, Android ABIs)",
+      "6. Download artifacts - Get Windows and Android arm32 (armeabi-v7a) builds from GitHub Actions",
+      "7. Deploy to test devices - Copy ZIPs to /store/0arepo/ (shared directory accessible by Windows and Android devices)",
+      "8. Install and test - Install from ZIP on Windows Kodi and Android Kodi, verify functionality"
     ],
+    "syntaxCheck": {
+      "script": "./scripts/check-syntax.sh",
+      "description": "Basic C++ syntax validation to catch common errors before pushing",
+      "usage": "Run before committing to catch syntax errors early",
+      "checks": [
+        "Type conversion issues",
+        "Function argument mismatches",
+        "Common C++ syntax errors"
+      ]
+    },
     "notes": [
       "Local builds are macOS-only via build.sh (not needed for Linux development)",
       "GitHub Actions handles all cross-platform builds automatically",
       "Windows build: pvr.xtreamcodes-<version>-windows.zip",
       "Android arm32 build: pvr.xtreamcodes-<version>-android-armeabi-v7a.zip",
-      "Shared test directory: /store/0arepo/"
+      "Shared test directory: /store/0arepo/",
+      "Run syntax check before pushing to catch errors early: ./scripts/check-syntax.sh"
     ],
     "targetPlatforms": [
       "Windows (primary testing)",
