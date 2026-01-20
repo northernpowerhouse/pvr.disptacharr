@@ -19,15 +19,30 @@ if(Kodi_FOUND)
   set(CMAKE_CXX_STANDARD 17)
   set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-  find_package(pugixml REQUIRED)
-
-  include_directories(${KODI_INCLUDE_DIR}/..
-                      ${PUGIXML_INCLUDE_DIRS})
+  # Try to find system pugixml, otherwise use bundled version
+  find_package(pugixml QUIET)
+  
+  if(pugixml_FOUND)
+    message(STATUS "Using system pugixml")
+    include_directories(${KODI_INCLUDE_DIR}/..
+                        ${PUGIXML_INCLUDE_DIRS})
+    set(DEPLIBS ${PUGIXML_LIBRARIES})
+  else()
+    message(STATUS "Using bundled pugixml")
+    include_directories(${KODI_INCLUDE_DIR}/..
+                        ${CMAKE_SOURCE_DIR}/src/pugixml)
+    set(DEPLIBS "")
+  endif()
 
   set(XTC_SOURCES
     src/addon.cpp
     src/xtream_client.cpp
   )
+  
+  # Add bundled pugixml if not using system version
+  if(NOT pugixml_FOUND)
+    list(APPEND XTC_SOURCES src/pugixml/pugixml.cpp)
+  endif()
 
   set(XTC_RESOURCES
     ${ADDON_ID}/addon.xml.in
@@ -35,9 +50,7 @@ if(Kodi_FOUND)
     ${ADDON_ID}/resources/language/resource.language.en_gb/strings.po
   )
 
-  set(DEPLIBS ${PUGIXML_LIBRARIES})
-  
-  message(STATUS "PUGIXML_LIBRARIES: ${PUGIXML_LIBRARIES}")
+  message(STATUS "DEPLIBS: ${DEPLIBS}")
   
   build_addon(${ADDON_ID} XTC DEPLIBS)
 
