@@ -38,7 +38,7 @@ jobs:
         timeout-minutes: 15
         run: |
           sudo apt-get update -y
-          sudo apt-get install -y cmake build-essential zip g++ 2>&1 | tail -20
+          sudo apt-get install -y cmake build-essential zip g++ libpugixml-dev 2>&1 | tail -20
           echo "Build dependencies installed successfully"
 
       - name: Install build deps (Windows)
@@ -48,6 +48,8 @@ jobs:
         run: |
           choco install cmake --installargs 'ADD_CMAKE_TO_PATH=System' -y
           choco install zip -y
+          # Install pugixml via vcpkg
+          vcpkg install pugixml:x64-windows
           echo "Build dependencies installed successfully"
 
       - name: Build and stage addon
@@ -167,6 +169,12 @@ jobs:
         id: setup-ndk
         with:
           ndk-version: r26d
+
+      - name: Install build deps (Android)
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y libpugixml-dev 2>&1 | tail -20
+          echo "Android build dependencies installed"
 
       - name: Build addon (Android)
         timeout-minutes: 45
