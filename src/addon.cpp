@@ -372,11 +372,8 @@ public:
     // member count manageable, preventing UI blocking on GetChannelGroupMembers().
     capabilities.SetSupportsChannelGroups(true);
 
-    // EPG is intentionally not implemented yet. Xtream Codes backend does not support EPG data.
-    // This must be set to false to prevent Kodi's EPG scraper from attempting to fetch EPG
-    // for all channels, which would cause "backend does not support EPGs" errors in the log.
-    // When this is false, Kodi will not attempt EPG updates for this addon's channels.
-    capabilities.SetSupportsEPG(false);
+    // EPG support via XMLTV from Xtream Codes server
+    capabilities.SetSupportsEPG(true);
 
     // We provide stream URLs and let Kodi handle playback.
     capabilities.SetHandlesInputStream(false);
@@ -585,6 +582,81 @@ public:
 
     properties.emplace_back(PVR_STREAM_PROPERTY_STREAMURL, url);
     properties.emplace_back(PVR_STREAM_PROPERTY_ISREALTIMESTREAM, "true");
+    return PVR_ERROR_NO_ERROR;
+  }
+
+  PVR_ERROR GetEPGForChannel(int channelUid, time_t start, time_t end, kodi::addon::PVREPGTagsResultSet& results) override
+  {
+    EnsureLoaded();
+
+    std::shared_ptr<const std::vector<xtream::ChannelEpg>> epgData;
+    std::shared_ptr<const UidToStreamMap> uidToStream;
+    {
+      std::lock_guard<std::mutex> lock(m_mutex);
+      epgData = m_epgData;
+      uidToStream = m_uidToStreamId;
+    }
+
+    if (!epgData || !uidToStream)
+      return PVR_ERROR_NO_ERROR;
+
+    // Find the stream ID for this channel UID
+    auto uidIt = uidToStream->find(static_cast<unsigned int>(channelUid));
+    if (uidIt == uidToStream->end())
+      return PVR_ERROR_NO_ERROR;
+
+    const int streamId = uidIt->second;
+    const std::string streamIdStr = std::to_string(streamId);
+
+    // Find EPG for this channel (match by stream ID as channel ID)
+    const xtream::ChannelEpg* channelEpg = nullptr;
+    for (const auto& epg : *epgData)
+    {
+      if (epg.id == streamIdStr)
+      {
+        channelEpg = &epg;
+        break;
+      }
+    }
+
+    if (!channelEpg || channelEpg->entries.empty())
+      return PVR_ERROR_NO_ERROR;
+
+    // Add EPG entries within the requested time window
+    for (const auto& kv : channelEpg->entries)
+    {
+      const auto& entry = kv.second;
+      
+      // Skip entries outside the requested window
+      if (entry.endTime < start || entry.startTime > end)
+        continue;
+
+      kodi::addon::PVREPGTag tag;
+      tag.SetUniqueBroadcastId(static_cast<unsigned int>(entry.startTime));
+      tag.SetUniqueChannelId(static_cast<unsigned int>(channelUid));
+      tag.SetTitle(entry.title);
+      tag.SetPlot(entry.description);
+      tag.SetStartTime(entry.startTime);
+      tag.SetEndTime(entry.endTime);
+      
+      if (!entry.episodeName.empty())
+        tag.SetEpisodeName(entry.episodeName);
+      if (!entry.iconPath.empty())
+        tag.SetIconPath(entry.iconPath);
+      if (entry.genreType > 0)
+        tag.SetGenreType(entry.genreType);
+      if (entry.year > 0)
+        tag.SetYear(entry.year);
+      if (entry.starRating > 0)
+        tag.SetStarRating(entry.starRating);
+      if (entry.seasonNumber >= 0)
+        tag.SetSeriesNumber(entry.seasonNumber);
+      if (entry.episodeNumber >= 0)
+        tag.SetEpisodeNumber(entry.episodeNumber);
+
+      results.Add(tag);
+    }
+
     return PVR_ERROR_NO_ERROR;
   }
 
@@ -1179,6 +1251,24 @@ private:
           m_groupsReady = true;
         }
 
+        // Load EPG data from XMLTV endpoint
+        std::string xmltvData;
+        if (xtream::FetchXMLTVEpg(settings, xmltvData))
+        {
+          kodi::Log(ADDON_LOG_INFO, "pvr.xtreamcodes: fetched XMLTV EPG data");
+          std::vector<xtream::ChannelEpg> epgData = xtream::ParseXMLTV(xmltvData, streams);
+          
+          std::lock_guard<std::mutex> lock(m_mutex);
+          m_epgData = std::make_shared<std::vector<xtream::ChannelEpg>>(std::move(epgData));
+          
+          kodi::Log(ADDON_LOG_INFO, "pvr.xtreamcodes: loaded EPG for %zu channels",
+                    m_epgData ? m_epgData->size() : 0u);
+        }
+        else
+        {
+          kodi::Log(ADDON_LOG_WARNING, "pvr.xtreamcodes: failed to fetch XMLTV EPG data");
+        }
+
         kodi::Log(ADDON_LOG_INFO,
                   "pvr.xtreamcodes: loaded %zu channels in %zu categories (%lld ms)",
                   m_channels ? m_channels->size() : 0u, categories.size(), static_cast<long long>(ms));
@@ -1396,6 +1486,7 @@ private:
   std::shared_ptr<const UidToStreamMap> m_uidToStreamId;
   std::shared_ptr<const std::vector<std::string>> m_groupNamesOrdered;
   std::shared_ptr<const GroupMembersMap> m_groupMembers;
+  std::shared_ptr<const std::vector<xtream::ChannelEpg>> m_epgData;
 
   std::string m_cacheSignatureAttempted;
 

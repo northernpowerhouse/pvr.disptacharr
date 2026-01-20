@@ -1,0 +1,448 @@
+{
+  "project": "pvr.xtreamcodes - EPG and Catchup Enhancement",
+  "version": "1.0.0",
+  "lastUpdated": "2026-01-21",
+  "status": "planning",
+  "researchSource": "kodi-pvr/pvr.iptvsimple",
+  
+  "researchFindings": {
+    "xmltvParsing": {
+      "library": "pugixml",
+      "description": "Lightweight C++ XML parser used throughout pvr.iptvsimple",
+      "keyFiles": [
+        "src/iptvsimple/Epg.cpp - Main EPG management",
+        "src/iptvsimple/data/EpgEntry.cpp - EPG entry parsing",
+        "src/iptvsimple/data/ChannelEpg.cpp - Channel-specific EPG"
+      ],
+      "xmltvStructure": {
+        "rootElement": "tv",
+        "channelElement": "channel (id, display-name, icon)",
+        "programmeElement": "programme (channel, start, stop, title, desc, sub-title, category, episode-num, icon)"
+      },
+      "loadingProcess": [
+        "Fetch XMLTV file (supports gzip, xz compression)",
+        "Parse <channel> elements first → create ChannelEpg objects",
+        "Match channels by tvg-id or display-name to existing channels",
+        "Parse <programme> elements → create EpgEntry objects",
+        "Link entries to channels via channel ID"
+      ]
+    },
+    
+    "kodiPvrEpgApi": {
+      "capabilityDeclaration": "capabilities.SetSupportsEPG(true)",
+      "mainApiMethod": "GetEPGForChannel(int channelUid, time_t start, time_t end, kodi::addon::PVREPGTagsResultSet& results)",
+      "epgTagFields": [
+        "SetUniqueChannelId",
+        "SetTitle",
+        "SetPlot (description)",
+        "SetStartTime",
+        "SetEndTime",
+        "SetEpisodeName",
+        "SetGenreType",
+        "SetIconPath"
+      ],
+      "workflow": "Find channel EPG → Iterate entries in time window → Populate PVREPGTag → Add to results"
+    },
+    
+    "catchupArchiveImplementation": {
+      "channelProperties": {
+        "hasCatchup": "boolean - Does channel support catchup?",
+        "catchupMode": "enum - DISABLED, DEFAULT, APPEND, SHIFT, etc.",
+        "catchupDays": "int - How many days of archive",
+        "catchupSource": "string - URL template",
+        "catchupSupportsTimeshifting": "boolean - Can seek within archive",
+        "catchupCorrectionSecs": "int - Time offset correction"
+      },
+      "m3uCatchupTags": "catchup, catchup-days, catchup-source",
+      "xtreamEquivalent": "tv_archive (boolean), tv_archive_duration (int)"
+    },
+    
+    "catchupPlaybackApis": {
+      "GetEPGTagStreamProperties": "Called when user selects an EPG entry to play (past program)",
+      "IsEPGTagPlayable": "Determine if this past EPG entry can be played",
+      "streamProperties": [
+        "PVR_STREAM_PROPERTY_STREAMURL - The actual stream URL",
+        "PVR_STREAM_PROPERTY_ISREALTIMESTREAM - 'true' for timeshift support",
+        "PVR_STREAM_PROPERTY_EPGPLAYBACKASLIVE - 'true' to enable seeking like live TV",
+        "PVR_STREAM_PROPERTY_INPUTSTREAM - e.g., 'inputstream.ffmpegdirect'"
+      ],
+      "playbackModes": {
+        "timeshifted": "ProcessEPGTagForTimeshiftedPlayback - play as live stream with timeshift",
+        "video": "ProcessEPGTagForVideoPlayback - play as bounded video (VOD style)"
+      }
+    },
+    
+    "visualIndicator": {
+      "mechanism": "No explicit icon/logo mechanism in pvr.iptvsimple",
+      "indication": "Catchup shown through EPG entries being playable, context menu 'Play' on past programs",
+      "proposedApproach": "Use channel icon path modification, property, or custom overlay indicator"
+    }
+  },
+  
+  "xtreamCodesApiDetails": {
+    "xmltvEndpoint": "http://domain:port/xmltv.php?username=USERNAME&password=PASSWORD",
+    "getLiveStreamsFields": {
+      "existing": ["stream_id", "category_id", "num", "name", "stream_icon"],
+      "toAdd": ["tv_archive", "tv_archive_duration"]
+    },
+    "catchupUrlFormat": "TBD - Need to research Xtream Codes specific catchup URL format"
+  },
+  
+  "implementationPhases": [
+    {
+      "phase": 1,
+      "name": "EPG (XMLTV) Implementation",
+      "status": "in-progress",
+      "tasks": [
+        {
+          "id": "epg-1",
+          "description": "Add pugixml dependency to CMakeLists.txt",
+          "status": "completed",
+          "files": ["CMakeLists.txt"],
+          "notes": "pugixml is available in Kodi addon SDK - confirmed by pvr.iptvsimple usage"
+        },
+        {
+          "id": "epg-2",
+          "description": "Add EpgEntry data structure to xtream_client.h",
+          "status": "completed",
+          "files": ["src/xtream_client.h"],
+          "notes": "Added EpgEntry struct with channelId, times, title, description, episode info, genre, year, ratings"
+        },
+        {
+          "id": "epg-3",
+          "description": "Add ChannelEpg data structure to manage EPG per channel",
+          "status": "completed",
+          "files": ["src/xtream_client.h"],
+          "notes": "Added ChannelEpg struct with id, displayName, iconPath, and map<time_t, EpgEntry> entries"
+        },
+        {
+          "id": "epg-4",
+          "description": "Implement FetchXMLTVEpg() in xtream_client.cpp",
+          "status": "completed",
+          "files": ["src/xtream_client.cpp", "src/xtream_client.h"],
+          "notes": "Implemented HTTP GET to xmltv.php endpoint with credentials"
+        },
+        {
+          "id": "epg-5",
+          "description": "Implement ParseXMLTV() to parse XMLTV format using pugixml",
+          "status": "completed",
+          "files": ["src/xtream_client.cpp"],
+          "notes": "Implemented XMLTV parsing with pugixml, matches channels by ID/name, parses programme data"
+        },
+        {
+          "id": "epg-6",
+          "description": "Add EPG data storage to CXtreamCodesPVRClient",
+          "status": "completed",
+          "files": ["src/addon.cpp"],
+          "notes": "Added m_epgData shared_ptr member variable for thread-safe access"
+        },
+        {
+          "id": "epg-7",
+          "description": "Enable EPG capability: SetSupportsEPG(true)",
+          "status": "completed",
+          "files": ["src/addon.cpp"],
+          "notes": "Changed GetCapabilities() SetSupportsEPG from false to true"
+        },
+        {
+          "id": "epg-8",
+          "description": "Implement GetEPGForChannel() callback",
+          "status": "completed",
+          "files": ["src/addon.cpp"],
+          "notes": "Implemented GetEPGForChannel() - returns EPG entries for channel UID in time window"
+        },
+        {
+          "id": "epg-9",
+          "description": "Integrate EPG loading into background worker thread",
+          "status": "completed",
+          "files": ["src/addon.cpp"],
+          "notes": "Added EPG fetch and parse calls in worker thread after channel loading"
+        },
+        {
+          "id": "epg-10",
+          "description": "Add EPG settings to settings.xml (enable/disable, refresh interval)",
+          "status": "not-started",
+          "files": ["pvr.xtreamcodes/resources/settings.xml"],
+          "notes": "Optional: allow users to disable EPG if not needed"
+        }
+      ]
+    },
+    {
+      "phase": 2,
+      "name": "Catchup Detection",
+      "status": "not-started",
+      "tasks": [
+        {
+          "id": "catchup-1",
+          "description": "Add tv_archive and tv_archive_duration to LiveStream struct",
+          "status": "completed",
+          "files": ["src/xtream_client.h"],
+          "notes": "Added bool tvArchive and int tvArchiveDuration fields to LiveStream"
+        },
+        {
+          "id": "catchup-2",
+          "description": "Parse tv_archive fields from get_live_streams JSON response",
+          "status": "not-started",
+          "files": ["src/xtream_client.cpp"],
+          "notes": "Use ExtractBoolField and ExtractIntField similar to existing parsing"
+        },
+        {
+          "id": "catchup-3",
+          "description": "Store catchup info with channel data",
+          "status": "not-started",
+          "files": ["src/addon.cpp"],
+          "notes": "Track which channels support catchup in channel data structure"
+        },
+        {
+          "id": "catchup-4",
+          "description": "Research Xtream Codes catchup URL format",
+          "status": "not-started",
+          "files": [],
+          "notes": "Determine exact URL pattern for catchup streams: http://domain/timeshift/username/password/duration/start_timestamp/stream_id.ts or .m3u8"
+        }
+      ]
+    },
+    {
+      "phase": 3,
+      "name": "Catchup Playback Implementation",
+      "status": "not-started",
+      "tasks": [
+        {
+          "id": "playback-1",
+          "description": "Implement IsEPGTagPlayable() callback",
+          "status": "not-started",
+          "files": ["src/addon.cpp"],
+          "notes": "Check if channel has tv_archive and EPG tag is within catchup window"
+        },
+        {
+          "id": "playback-2",
+          "description": "Implement GetEPGTagStreamProperties() callback",
+          "status": "not-started",
+          "files": ["src/addon.cpp"],
+          "notes": "Build catchup URL, set stream properties for playback"
+        },
+        {
+          "id": "playback-3",
+          "description": "Add BuildCatchupStreamUrl() to xtream_client",
+          "status": "not-started",
+          "files": ["src/xtream_client.cpp", "src/xtream_client.h"],
+          "notes": "Generate catchup URL from stream ID, start time, duration"
+        },
+        {
+          "id": "playback-4",
+          "description": "Implement catchup time window validation",
+          "status": "not-started",
+          "files": ["src/addon.cpp"],
+          "notes": "Ensure requested time is within tv_archive_duration hours from now"
+        },
+        {
+          "id": "playback-5",
+          "description": "Add catchup mode setting (timeshift vs VOD)",
+          "status": "not-started",
+          "files": ["pvr.xtreamcodes/resources/settings.xml", "src/addon.cpp"],
+          "notes": "Let user choose playback style for catchup content"
+        },
+        {
+          "id": "playback-6",
+          "description": "Set appropriate stream properties for timeshift playback",
+          "status": "not-started",
+          "files": ["src/addon.cpp"],
+          "notes": "PVR_STREAM_PROPERTY_ISREALTIMESTREAM, PVR_STREAM_PROPERTY_EPGPLAYBACKASLIVE"
+        }
+      ]
+    },
+    {
+      "phase": 4,
+      "name": "Visual Catchup Indicator",
+      "status": "not-started",
+      "tasks": [
+        {
+          "id": "visual-1",
+          "description": "Research Kodi channel property mechanisms for catchup indicator",
+          "status": "not-started",
+          "files": [],
+          "notes": "Investigate if PVRChannel has properties for custom icons/overlays"
+        },
+        {
+          "id": "visual-2",
+          "description": "Design catchup indicator approach",
+          "status": "not-started",
+          "files": [],
+          "notes": "Options: icon overlay, channel name suffix, custom property"
+        },
+        {
+          "id": "visual-3",
+          "description": "Implement catchup indicator on channels with tv_archive=true",
+          "status": "not-started",
+          "files": ["src/addon.cpp"],
+          "notes": "Apply visual indicator to catchup-enabled channels"
+        },
+        {
+          "id": "visual-4",
+          "description": "Add catchup icon asset to media/ folder",
+          "status": "not-started",
+          "files": ["media/"],
+          "notes": "Small overlay icon or badge to indicate catchup support"
+        }
+      ]
+    },
+    {
+      "phase": 5,
+      "name": "Testing and Refinement",
+      "status": "not-started",
+      "tasks": [
+        {
+          "id": "test-1",
+          "description": "Build test version via GitHub Actions",
+          "status": "not-started",
+          "files": [],
+          "notes": "Push code, let GitHub Actions build, download Windows and Android arm32 ZIPs to /store/0arepo/"
+        },
+        {
+          "id": "test-1a",
+          "description": "Test EPG loading from Xtream server on Windows",
+          "status": "not-started",
+          "files": [],
+          "notes": "Install on Windows Kodi, verify XMLTV parsing, channel matching, time zone handling"
+        },
+        {
+          "id": "test-1b",
+          "description": "Test EPG loading from Xtream server on Android",
+          "status": "not-started",
+          "files": [],
+          "notes": "Install on Android Kodi, verify XMLTV parsing, channel matching, time zone handling"
+        },
+        {
+          "id": "test-2",
+          "description": "Test catchup detection from get_live_streams on both platforms",
+          "status": "not-started",
+          "files": [],
+          "notes": "Verify tv_archive fields are parsed correctly on Windows and Android"
+        },
+        {
+          "id": "test-3",
+          "description": "Test catchup playback with real Xtream server on Windows",
+          "status": "not-started",
+          "files": [],
+          "notes": "Verify catchup URLs work, playback is smooth, seeking works"
+        },
+        {
+          "id": "test-3a",
+          "description": "Test catchup playback with real Xtream server on Android",
+          "status": "not-started",
+          "files": [],
+          "notes": "Verify catchup URLs work, playback is smooth, seeking works on mobile device"
+        },
+        {
+          "id": "test-4",
+          "description": "Test visual indicators for catchup channels on both platforms",
+          "status": "not-started",
+          "files": [],
+          "notes": "Ensure catchup channels are visually distinct on Windows and Android UIs"
+        },
+        {
+          "id": "test-5",
+          "description": "Performance testing with large EPG data",
+          "status": "not-started",
+          "files": [],
+          "notes": "Test with 1000+ channels and week of EPG data"
+        },
+        {
+          "id": "test-6",
+          "description": "Error handling and edge cases",
+          "status": "not-started",
+          "files": [],
+          "notes": "Missing EPG, network errors, invalid catchup times"
+        }
+      ]
+    }
+  ],
+  
+  "technicalDecisions": {
+    "xmlParser": {
+      "choice": "pugixml",
+      "rationale": "Used by pvr.iptvsimple, lightweight, already available in Kodi ecosystem",
+      "alternatives": "tinyxml2, RapidXML"
+    },
+    "epgStorage": {
+      "approach": "In-memory with caching",
+      "rationale": "Following pvr.iptvsimple pattern, efficient for lookups",
+      "notes": "Store in thread-safe shared_ptr structures like existing channel data"
+    },
+    "catchupUrlFormat": {
+      "status": "needs-research",
+      "possibleFormats": [
+        "http://domain:port/timeshift/{username}/{password}/{duration}/{start_timestamp}/{stream_id}.ts",
+        "http://domain:port/timeshift/{username}/{password}/{duration}/{start_timestamp}/{stream_id}.m3u8",
+        "http://domain:port/streaming/timeshift.php?username={username}&password={password}&stream={stream_id}&start={start}&duration={duration}"
+      ]
+    },
+    "threadSafety": {
+      "approach": "Follow existing pattern with std::mutex and std::shared_ptr",
+      "rationale": "Consistent with current codebase architecture"
+    }
+  },
+  
+  "dependencies": {
+    "required": [
+      "pugixml (likely already in Kodi addon SDK)",
+      "kodi/addon-instance/PVR.h (existing)",
+      "C++17 standard library (existing)"
+    ],
+    "optional": [
+      "zlib for gzip XMLTV decompression (may be in Kodi SDK)"
+    ]
+  },
+  
+  "knownChallenges": [
+    "XMLTV channel matching to Xtream stream IDs - may need fuzzy matching by name",
+    "Time zone handling for EPG times vs catchup timestamps",
+    "Xtream Codes catchup URL format - needs verification with real server",
+    "Large XMLTV file parsing performance - may need streaming parser",
+    "EPG refresh strategy - full reload vs incremental updates",
+    "Catchup visual indicator - Kodi API may not support overlays directly"
+  ],
+  
+  "developmentWorkflow": {
+    "description": "Development and testing process for pvr.xtreamcodes",
+    "steps": [
+      "1. Code locally - Make changes to source files",
+      "2. Commit changes - Git commit with descriptive message",
+      "3. Push to GitHub - Push to feature branch or create tag with 'v*' prefix for releases",
+      "4. GitHub Actions builds - Automatic build for all platforms (macOS, Linux, Windows, Android ABIs)",
+      "5. Download artifacts - Get Windows and Android arm32 (armeabi-v7a) builds from GitHub Actions",
+      "6. Deploy to test devices - Copy ZIPs to /store/0arepo/ (shared directory accessible by Windows and Android devices)",
+      "7. Install and test - Install from ZIP on Windows Kodi and Android Kodi, verify functionality"
+    ],
+    "notes": [
+      "Local builds are macOS-only via build.sh (not needed for Linux development)",
+      "GitHub Actions handles all cross-platform builds automatically",
+      "Windows build: pvr.xtreamcodes-<version>-windows.zip",
+      "Android arm32 build: pvr.xtreamcodes-<version>-android-armeabi-v7a.zip",
+      "Shared test directory: /store/0arepo/"
+    ],
+    "targetPlatforms": [
+      "Windows (primary testing)",
+      "Android arm32/armeabi-v7a (primary testing)",
+      "Linux (available but not primary test target)",
+      "macOS arm64 and x86_64 (available)",
+      "Android arm64-v8a and x86_64 (available)"
+    ]
+  },
+  
+  "nextSteps": [
+    "Begin Phase 1: Implement basic EPG structure and XMLTV fetching",
+    "Test with sample XMLTV file to verify parsing logic",
+    "Research exact Xtream Codes catchup URL format",
+    "Push to GitHub and verify CI/CD builds successfully",
+    "Download Windows and Android builds to /store/0arepo/",
+    "Test on actual Windows and Android Kodi instances",
+    "Implement incremental features and test each phase before moving to next"
+  ],
+  
+  "references": {
+    "pvr.iptvsimple": "https://github.com/kodi-pvr/pvr.iptvsimple",
+    "kodiPvrApi": "Kodi addon SDK - kodi/addon-instance/PVR.h",
+    "pugixml": "https://pugixml.org/",
+    "xmltvFormat": "http://wiki.xmltv.org/index.php/XMLTVFormat"
+  }
+}

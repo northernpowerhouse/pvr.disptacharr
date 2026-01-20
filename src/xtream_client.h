@@ -2,6 +2,8 @@
 
 #include <string>
 #include <vector>
+#include <map>
+#include <ctime>
 
 namespace xtream
 {
@@ -36,6 +38,36 @@ struct LiveStream
   int number = 0;
   std::string name;
   std::string icon;
+  
+  // Catchup/Archive support
+  bool tvArchive = false;
+  int tvArchiveDuration = 0; // Duration in hours
+};
+
+struct EpgEntry
+{
+  std::string channelId;      // Maps to stream ID or tvg-id
+  time_t startTime = 0;
+  time_t endTime = 0;
+  std::string title;
+  std::string description;
+  std::string episodeName;    // Sub-title
+  std::string iconPath;
+  std::string genreString;
+  int genreType = 0;
+  int genreSubType = 0;
+  int year = 0;
+  int starRating = 0;
+  int seasonNumber = -1;
+  int episodeNumber = -1;
+};
+
+struct ChannelEpg
+{
+  std::string id;                          // Channel ID (tvg-id or stream ID)
+  std::string displayName;                 // Channel display name
+  std::string iconPath;                    // Channel icon from EPG
+  std::map<time_t, EpgEntry> entries;      // EPG entries keyed by start time
 };
 
 struct FetchResult
@@ -54,4 +86,10 @@ FetchResult FetchAllLiveStreams(const Settings& settings,
                                 std::vector<LiveStream>& streams);
 
 std::string BuildLiveStreamUrl(const Settings& settings, int streamId, const std::string& streamFormat);
+
+// EPG/XMLTV functions
+FetchResult FetchXMLTVEpg(const Settings& settings, std::string& xmltvData);
+bool ParseXMLTV(const std::string& xmltvData, 
+                const std::vector<LiveStream>& streams,
+                std::vector<ChannelEpg>& channelEpgs);
 } // namespace xtream

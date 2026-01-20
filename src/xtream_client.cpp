@@ -2,6 +2,7 @@
 
 #include <kodi/Filesystem.h>
 #include <kodi/General.h>
+#include <pugixml.hpp>
 
 #include <algorithm>
 #include <cctype>
@@ -11,6 +12,7 @@
 #include <cstdlib>
 #include <string>
 #include <string_view>
+#include <unordered_map>
 #include <vector>
 
 namespace
@@ -853,5 +855,206 @@ std::string BuildLiveStreamUrl(const Settings& settings, int streamId, const std
   std::string url = base + "/live/" + UrlEncode(settings.username) + "/" +
                     UrlEncode(settings.password) + "/" + std::to_string(streamId) + ext;
   return url;
+}
+
+FetchResult FetchXMLTVEpg(const Settings& settings, std::string& xmltvData)
+{
+  xmltvData.clear();
+
+  const std::string base = BuildBaseUrl(settings);
+  if (base.empty())
+    return {false, "Failed to build base URL"};
+
+  // Build XMLTV URL: http://domain:port/xmltv.php?username=X&password=Y
+  std::string url = base + "/xmltv.php?username=" + UrlEncode(settings.username) +
+                    "&password=" + UrlEncode(settings.password);
+
+  const std::string ua = EffectiveUserAgent(settings);
+  const HttpResult http = HttpGet(url, ua, settings.timeoutSeconds);
+  
+  if (!http.ok)
+    return {false, http.protocol.empty() ? std::string("Failed to fetch XMLTV") : http.protocol};
+
+  xmltvData = http.body;
+  
+  // Basic validation - check if it looks like XML
+  if (xmltvData.empty())
+    return {false, "XMLTV response is empty"};
+    
+  if (xmltvData.find("<?xml") == std::string::npos && xmltvData.find("<tv") == std::string::npos)
+    return {false, "XMLTV response doesn't appear to be XML"};
+
+  return {true, http.protocol.empty() ? std::string("OK") : http.protocol};
+}
+
+bool ParseXMLTV(const std::string& xmltvData, 
+                const std::vector<LiveStream>& streams,
+                std::vector<ChannelEpg>& channelEpgs)
+{
+  channelEpgs.clear();
+
+  if (xmltvData.empty())
+    return false;
+
+  // Parse XML
+  pugi::xml_document doc;
+  pugi::xml_parse_result result = doc.load_string(xmltvData.c_str());
+  
+  if (!result)
+  {
+    kodi::Log(ADDON_LOG_ERROR, "pvr.xtreamcodes: Failed to parse XMLTV: %s (offset: %d)", 
+              result.description(), static_cast<int>(result.offset));
+    return false;
+  }
+
+  const auto& tvNode = doc.child("tv");
+  if (!tvNode)
+  {
+    kodi::Log(ADDON_LOG_ERROR, "pvr.xtreamcodes: XMLTV missing <tv> root element");
+    return false;
+  }
+
+  // Create a lookup map of stream ID to stream name for matching
+  std::unordered_map<int, std::string> streamIdToName;
+  std::unordered_map<std::string, int> streamNameToId;
+  for (const auto& stream : streams)
+  {
+    if (stream.id > 0)
+    {
+      streamIdToName[stream.id] = stream.name;
+      streamNameToId[ToLower(stream.name)] = stream.id;
+    }
+  }
+
+  // First pass: Parse channel elements and match to our streams
+  std::unordered_map<std::string, ChannelEpg> epgMap;
+  
+  for (const auto& channelNode : tvNode.children("channel"))
+  {
+    const char* idAttr = channelNode.attribute("id").value();
+    if (!idAttr || idAttr[0] == '\0')
+      continue;
+
+    ChannelEpg epg;
+    epg.id = idAttr;
+    
+    // Get display name
+    const auto& displayNameNode = channelNode.child("display-name");
+    if (displayNameNode)
+      epg.displayName = displayNameNode.child_value();
+    
+    // Get icon
+    const auto& iconNode = channelNode.child("icon");
+    if (iconNode)
+    {
+      const char* srcAttr = iconNode.attribute("src").value();
+      if (srcAttr && srcAttr[0] != '\0')
+        epg.iconPath = srcAttr;
+    }
+
+    epgMap[epg.id] = epg;
+  }
+
+  // Second pass: Parse programme elements
+  int programmeCount = 0;
+  
+  for (const auto& programmeNode : tvNode.children("programme"))
+  {
+    const char* channelAttr = programmeNode.attribute("channel").value();
+    if (!channelAttr || channelAttr[0] == '\0')
+      continue;
+
+    const std::string channelId = channelAttr;
+    
+    // Check if we have this channel in our EPG map
+    auto epgIt = epgMap.find(channelId);
+    if (epgIt == epgMap.end())
+      continue;
+
+    EpgEntry entry;
+    entry.channelId = channelId;
+
+    // Parse start and stop times (format: YYYYMMDDHHmmss +TZ)
+    const char* startAttr = programmeNode.attribute("start").value();
+    const char* stopAttr = programmeNode.attribute("stop").value();
+    
+    if (startAttr && startAttr[0] != '\0')
+    {
+      // Parse XMLTV time format: 20260121120000 +0000
+      struct tm tm = {};
+      if (sscanf(startAttr, "%4d%2d%2d%2d%2d%2d", 
+                 &tm.tm_year, &tm.tm_mon, &tm.tm_mday,
+                 &tm.tm_hour, &tm.tm_min, &tm.tm_sec) == 6)
+      {
+        tm.tm_year -= 1900;
+        tm.tm_mon -= 1;
+        tm.tm_isdst = -1;
+        entry.startTime = mktime(&tm);
+      }
+    }
+    
+    if (stopAttr && stopAttr[0] != '\0')
+    {
+      struct tm tm = {};
+      if (sscanf(stopAttr, "%4d%2d%2d%2d%2d%2d", 
+                 &tm.tm_year, &tm.tm_mon, &tm.tm_mday,
+                 &tm.tm_hour, &tm.tm_min, &tm.tm_sec) == 6)
+      {
+        tm.tm_year -= 1900;
+        tm.tm_mon -= 1;
+        tm.tm_isdst = -1;
+        entry.endTime = mktime(&tm);
+      }
+    }
+
+    // Skip entries with invalid times
+    if (entry.startTime == 0 || entry.endTime == 0 || entry.endTime <= entry.startTime)
+      continue;
+
+    // Parse title
+    const auto& titleNode = programmeNode.child("title");
+    if (titleNode)
+      entry.title = titleNode.child_value();
+
+    // Parse description
+    const auto& descNode = programmeNode.child("desc");
+    if (descNode)
+      entry.description = descNode.child_value();
+
+    // Parse sub-title (episode name)
+    const auto& subTitleNode = programmeNode.child("sub-title");
+    if (subTitleNode)
+      entry.episodeName = subTitleNode.child_value();
+
+    // Parse icon
+    const auto& iconNode = programmeNode.child("icon");
+    if (iconNode)
+    {
+      const char* srcAttr = iconNode.attribute("src").value();
+      if (srcAttr && srcAttr[0] != '\0')
+        entry.iconPath = srcAttr;
+    }
+
+    // Parse category (genre)
+    const auto& categoryNode = programmeNode.child("category");
+    if (categoryNode)
+      entry.genreString = categoryNode.child_value();
+
+    // Add entry to channel's EPG (keyed by start time)
+    epgIt->second.entries[entry.startTime] = entry;
+    programmeCount++;
+  }
+
+  // Convert map to vector (only channels with EPG entries)
+  for (const auto& kv : epgMap)
+  {
+    if (!kv.second.entries.empty())
+      channelEpgs.push_back(kv.second);
+  }
+
+  kodi::Log(ADDON_LOG_INFO, "pvr.xtreamcodes: Parsed XMLTV - %d channels, %d programmes",
+            static_cast<int>(channelEpgs.size()), programmeCount);
+
+  return !channelEpgs.empty();
 }
 } // namespace xtream
