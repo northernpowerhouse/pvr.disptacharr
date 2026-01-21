@@ -692,23 +692,20 @@ Settings LoadSettings()
   kodi::addon::GetSettingString("custom_user_agent", s.customUserAgent);
 
   // Kodi sometimes doesn't transfer settings to binary addons early during startup.
-  // Fall back to reading the persisted settings.xml from addon_data.
-  if (Trim(s.server).empty() || Trim(s.username).empty() || Trim(s.password).empty())
+  // Always read persisted settings.xml from addon_data and overlay any values found.
   {
     std::string xml;
     if (ReadVfsTextFile("special://profile/addon_data/pvr.xtreamcodes/settings.xml", xml))
     {
       std::string tmp;
-      if (Trim(s.server).empty() && ExtractSettingValue(xml, "server", tmp))
+      if (ExtractSettingValue(xml, "server", tmp))
         s.server = tmp;
-      if ((s.port <= 0 || s.port > 65535))
-        ExtractSettingInt(xml, "port", s.port);
-      if (Trim(s.username).empty() && ExtractSettingValue(xml, "username", tmp))
+      ExtractSettingInt(xml, "port", s.port);
+      if (ExtractSettingValue(xml, "username", tmp))
         s.username = tmp;
-      if (Trim(s.password).empty() && ExtractSettingValue(xml, "password", tmp))
+      if (ExtractSettingValue(xml, "password", tmp))
         s.password = tmp;
-      if (s.timeoutSeconds <= 0)
-        ExtractSettingInt(xml, "timeout_seconds", s.timeoutSeconds);
+      ExtractSettingInt(xml, "timeout_seconds", s.timeoutSeconds);
       ExtractSettingBool(xml, "enable_user_agent_spoofing", s.enableUserAgentSpoofing);
       if (ExtractSettingValue(xml, "custom_user_agent", tmp))
         s.customUserAgent = tmp;
