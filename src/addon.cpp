@@ -354,6 +354,9 @@ public:
     std::lock_guard<std::mutex> lock(m_mutex);
     m_settingsOverride = settings;
     m_hasSettingsOverride = true;
+    // Also update m_xtreamSettings so that immediate operations (like catchup URL generation)
+    // use the latest settings without waiting for a full reload
+    m_xtreamSettings = settings;
   }
 
   void ClearSettingsOverride()
