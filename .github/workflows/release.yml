@@ -18,6 +18,8 @@ jobs:
             label: linux
           - os: windows-2022
             label: windows
+            cmake_generator: "Visual Studio 17 2022"
+            cmake_generator_platform: "x64"
     name: Build ${{ matrix.label }}
     runs-on: ${{ matrix.os }}
     steps:
@@ -48,8 +50,6 @@ jobs:
         run: |
           choco install cmake --installargs 'ADD_CMAKE_TO_PATH=System' -y
           choco install zip -y
-          # Install pugixml via vcpkg
-          vcpkg install pugixml:x64-windows
           echo "Build dependencies installed successfully"
 
       - name: Build and stage addon
@@ -58,6 +58,8 @@ jobs:
         env:
           KODI_ADDON_SDK: xbmc/xbmc/addons/kodi-dev-kit
           VERSION: ${{ github.event_name == 'release' && github.event.release.tag_name || '' }}
+          CMAKE_GENERATOR: ${{ matrix.cmake_generator }}
+          CMAKE_GENERATOR_PLATFORM: ${{ matrix.cmake_generator_platform }}
         run: |
           echo "KODI_ADDON_SDK=$KODI_ADDON_SDK"
           ls -la "$KODI_ADDON_SDK/include/kodi/addon-instance/" || true
