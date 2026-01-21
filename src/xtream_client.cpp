@@ -18,7 +18,7 @@
 namespace
 {
 constexpr const char* kDefaultAddonUserAgent = "XtreamCodesKodiAddon";
-constexpr size_t kMaxHttpBodyBytes = 5 * 1024 * 1024; // cap responses to protect memory
+constexpr size_t kMaxHttpBodyBytes = 50 * 1024 * 1024; // cap responses to protect memory (XMLTV can be large)
 
 std::string Trim(std::string s)
 {
