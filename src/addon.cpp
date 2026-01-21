@@ -716,7 +716,7 @@ public:
   {
     EnsureLoaded();
     
-    kodi::Log(ADDON_LOG_DEBUG, "GetEPGTagStreamProperties: channel=%u, start=%ld, end=%ld",
+    kodi::Log(ADDON_LOG_INFO, "GetEPGTagStreamProperties CALLED: channel=%u, start=%ld, end=%ld",
               tag.GetUniqueChannelId(), tag.GetStartTime(), tag.GetEndTime());
 
     std::shared_ptr<const std::vector<xtream::LiveStream>> streams;
@@ -746,14 +746,19 @@ public:
 
         // Build catchup URL
         const std::string url = xtream::BuildCatchupUrl(settings, stream.id, startTime, endTime, streamFormat);
-        kodi::Log(ADDON_LOG_DEBUG, "GetEPGTagStreamProperties: catchup URL = %s", url.c_str());
+        kodi::Log(ADDON_LOG_INFO, "GetEPGTagStreamProperties: catchup URL = %s", url.c_str());
         
         if (url.empty())
+        {
+          kodi::Log(ADDON_LOG_ERROR, "GetEPGTagStreamProperties: catchup URL is EMPTY, returning ERROR");
           return PVR_ERROR_UNKNOWN;
+        }
 
         properties.emplace_back(PVR_STREAM_PROPERTY_STREAMURL, url);
+        kodi::Log(ADDON_LOG_INFO, "GetEPGTagStreamProperties: added STREAMURL property");
         properties.emplace_back(PVR_STREAM_PROPERTY_ISREALTIMESTREAM, "true");
         properties.emplace_back(PVR_STREAM_PROPERTY_EPGPLAYBACKASLIVE, "true");
+        kodi::Log(ADDON_LOG_INFO, "GetEPGTagStreamProperties: returning SUCCESS with %d properties", (int)properties.size());
         return PVR_ERROR_NO_ERROR;
       }
     }
