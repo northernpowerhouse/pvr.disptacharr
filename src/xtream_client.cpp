@@ -969,7 +969,7 @@ bool ParseXMLTV(const std::string& xmltvData,
 
   // Create a lookup map of stream ID to stream name for matching
   std::unordered_map<int, std::string> streamIdToName;
-  std::unordered_map<std::string, int> streamNameToId;
+  std::unordered_map<std::string, std::vector<int>> streamNameToIds;
   for (const auto& stream : streams)
   {
     if (stream.id > 0)
@@ -977,13 +977,13 @@ bool ParseXMLTV(const std::string& xmltvData,
       streamIdToName[stream.id] = stream.name;
       const std::string normName = NormalizeChannelNameForEpg(stream.name);
       if (!normName.empty())
-        streamNameToId[ToLower(normName)] = stream.id;
+        streamNameToIds[ToLower(normName)].push_back(stream.id);
     }
   }
 
   // First pass: Parse channel elements and match to our streams
   std::unordered_map<std::string, ChannelEpg> epgMap;
-  std::unordered_map<std::string, std::string> xmltvIdToMappedId;
+  std::unordered_map<std::string, std::vector<std::string>> xmltvIdToMappedIds;
   int totalXmltvChannels = 0;
   int mappedByNumericId = 0;
   int mappedByName = 0;
@@ -1018,7 +1018,7 @@ bool ParseXMLTV(const std::string& xmltvData,
     }
 
     // Map XMLTV channel ID or display-name to stream ID for Kodi EPG lookup
-    std::string mappedId = xmltvId;
+    std::vector<std::string> mappedIds;
     bool matched = false;
 
     char* end = nullptr;
@@ -1028,7 +1028,7 @@ bool ParseXMLTV(const std::string& xmltvData,
       const int streamId = static_cast<int>(numericId);
       if (streamIdToName.find(streamId) != streamIdToName.end())
       {
-        mappedId = std::to_string(streamId);
+        mappedIds.push_back(std::to_string(streamId));
         matched = true;
         mappedByNumericId++;
       }
@@ -1036,10 +1036,11 @@ bool ParseXMLTV(const std::string& xmltvData,
 
     if (!matched && !displayNameNormalized.empty())
     {
-      const auto nameIt = streamNameToId.find(ToLower(displayNameNormalized));
-      if (nameIt != streamNameToId.end())
+      const auto nameIt = streamNameToIds.find(ToLower(displayNameNormalized));
+      if (nameIt != streamNameToIds.end() && !nameIt->second.empty())
       {
-        mappedId = std::to_string(nameIt->second);
+        for (int streamId : nameIt->second)
+          mappedIds.push_back(std::to_string(streamId));
         matched = true;
         mappedByName++;
       }
@@ -1048,9 +1049,26 @@ bool ParseXMLTV(const std::string& xmltvData,
     if (!matched)
       unmapped++;
 
-    epg.id = mappedId;
-    epgMap[epg.id] = epg;
-    xmltvIdToMappedId[xmltvId] = mappedId;
+    if (mappedIds.empty())
+    {
+      // Keep XMLTV id to allow debugging but it won't match any stream id.
+      epg.id = xmltvId;
+      epgMap[epg.id] = epg;
+      xmltvIdToMappedIds[xmltvId] = {xmltvId};
+      continue;
+    }
+
+    xmltvIdToMappedIds[xmltvId] = mappedIds;
+    for (const auto& mappedId : mappedIds)
+    {
+      ChannelEpg& target = epgMap[mappedId];
+      if (target.id.empty())
+        target.id = mappedId;
+      if (target.displayName.empty())
+        target.displayName = epg.displayName;
+      if (target.iconPath.empty())
+        target.iconPath = epg.iconPath;
+    }
   }
 
   kodi::Log(ADDON_LOG_INFO,
@@ -1066,18 +1084,13 @@ bool ParseXMLTV(const std::string& xmltvData,
     if (!channelAttr || channelAttr[0] == '\0')
       continue;
 
-    std::string channelId = channelAttr;
-    const auto mapIt = xmltvIdToMappedId.find(channelId);
-    if (mapIt != xmltvIdToMappedId.end())
-      channelId = mapIt->second;
-    
-    // Check if we have this channel in our EPG map
-    auto epgIt = epgMap.find(channelId);
-    if (epgIt == epgMap.end())
+    const std::string xmltvChannelId = channelAttr;
+    const auto mapIt = xmltvIdToMappedIds.find(xmltvChannelId);
+    if (mapIt == xmltvIdToMappedIds.end() || mapIt->second.empty())
       continue;
-
+    
     EpgEntry entry;
-    entry.channelId = channelId;
+    entry.channelId = xmltvChannelId;
 
     // Parse start and stop times (format: YYYYMMDDHHmmss +TZ)
     const char* startAttr = programmeNode.attribute("start").value();
@@ -1145,9 +1158,15 @@ bool ParseXMLTV(const std::string& xmltvData,
     if (categoryNode)
       entry.genreString = categoryNode.child_value();
 
-    // Add entry to channel's EPG (keyed by start time)
-    epgIt->second.entries[entry.startTime] = entry;
-    programmeCount++;
+    // Add entry to each mapped stream's EPG (keyed by start time)
+    for (const auto& mappedId : mapIt->second)
+    {
+      auto epgIt = epgMap.find(mappedId);
+      if (epgIt == epgMap.end())
+        continue;
+      epgIt->second.entries[entry.startTime] = entry;
+      programmeCount++;
+    }
   }
 
   // Convert map to vector (only channels with EPG entries)
