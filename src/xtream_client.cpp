@@ -974,8 +974,8 @@ std::string BuildCatchupUrl(const Settings& settings, int streamId, time_t start
   if (base.empty() || streamId <= 0 || startTime <= 0 || endTime <= startTime)
     return {};
 
-  // Apply catchup start offset
-  time_t adjustedStartTime = startTime + settings.catchupStartOffsetSecs;
+  // Apply catchup start offset (convert hours to seconds)
+  time_t adjustedStartTime = startTime + (settings.catchupStartOffsetHours * 3600);
   
   // Calculate duration in minutes
   const int durationMinutes = static_cast<int>((endTime - adjustedStartTime) / 60);

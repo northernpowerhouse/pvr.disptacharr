@@ -102,9 +102,9 @@ msgid "Custom user agent"
 msgstr "Custom user agent"
 
 msgctxt "#30403"
-msgid "Catchup start time offset (seconds)"
-msgstr "Catchup start time offset (seconds)"
+msgid "Catchup start time offset (hours)"
+msgstr "Catchup start time offset (hours)"
 
 msgctxt "#30404"
-msgid "{0:d} seconds"
-msgstr "{0:d} seconds"
+msgid "{0:d} hours"
+msgstr "{0:d} hours"

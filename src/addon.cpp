@@ -1682,8 +1682,8 @@ public:
       m_cachedSettings.password = settingValue.GetString();
     else if (settingName == "timeout_seconds")
       m_cachedSettings.timeoutSeconds = settingValue.GetInt();
-    else if (settingName == "catchup_start_offset_secs")
-      m_cachedSettings.catchupStartOffsetSecs = settingValue.GetInt();
+    else if (settingName == "catchup_start_offset_hours")
+      m_cachedSettings.catchupStartOffsetHours = settingValue.GetInt();
     else if (settingName == "enable_user_agent_spoofing")
       m_cachedSettings.enableUserAgentSpoofing = settingValue.GetBoolean();
     else if (settingName == "custom_user_agent")
