@@ -38,6 +38,7 @@ struct LiveStream
   int number = 0;
   std::string name;
   std::string icon;
+  std::string epgChannelId; // XMLTV channel id from provider (if available)
   
   // Catchup/Archive support
   bool tvArchive = false;

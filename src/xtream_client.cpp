@@ -841,6 +841,7 @@ FetchResult FetchLiveStreams(const Settings& settings, int categoryId, std::vect
         ExtractIntField(obj, "num", s.number);
         ExtractStringField(obj, "name", s.name);
         ExtractStringField(obj, "stream_icon", s.icon);
+        ExtractStringField(obj, "epg_channel_id", s.epgChannelId);
         out.push_back(std::move(s));
       }))
     return {false, "Streams response was not a JSON array"};
@@ -970,6 +971,7 @@ bool ParseXMLTV(const std::string& xmltvData,
   // Create a lookup map of stream ID to stream name for matching
   std::unordered_map<int, std::string> streamIdToName;
   std::unordered_map<std::string, std::vector<int>> streamNameToIds;
+  std::unordered_map<std::string, std::vector<int>> xmltvIdToStreamIds;
   for (const auto& stream : streams)
   {
     if (stream.id > 0)
@@ -978,6 +980,9 @@ bool ParseXMLTV(const std::string& xmltvData,
       const std::string normName = NormalizeChannelNameForEpg(stream.name);
       if (!normName.empty())
         streamNameToIds[ToLower(normName)].push_back(stream.id);
+
+      if (!stream.epgChannelId.empty())
+        xmltvIdToStreamIds[stream.epgChannelId].push_back(stream.id);
     }
   }
 
@@ -986,6 +991,7 @@ bool ParseXMLTV(const std::string& xmltvData,
   std::unordered_map<std::string, std::vector<std::string>> xmltvIdToMappedIds;
   int totalXmltvChannels = 0;
   int mappedByNumericId = 0;
+  int mappedByEpgId = 0;
   int mappedByName = 0;
   int unmapped = 0;
   
@@ -1021,9 +1027,19 @@ bool ParseXMLTV(const std::string& xmltvData,
     std::vector<std::string> mappedIds;
     bool matched = false;
 
+    // Prefer explicit epg_channel_id mapping from stream list
+    const auto epgIdIt = xmltvIdToStreamIds.find(xmltvId);
+    if (epgIdIt != xmltvIdToStreamIds.end() && !epgIdIt->second.empty())
+    {
+      for (int streamId : epgIdIt->second)
+        mappedIds.push_back(std::to_string(streamId));
+      matched = true;
+      mappedByEpgId++;
+    }
+
     char* end = nullptr;
     const long numericId = std::strtol(xmltvId.c_str(), &end, 10);
-    if (end && *end == '\0' && numericId > 0)
+    if (!matched && end && *end == '\0' && numericId > 0)
     {
       const int streamId = static_cast<int>(numericId);
       if (streamIdToName.find(streamId) != streamIdToName.end())
@@ -1072,8 +1088,8 @@ bool ParseXMLTV(const std::string& xmltvData,
   }
 
   kodi::Log(ADDON_LOG_INFO,
-            "pvr.xtreamcodes: XMLTV channel mapping: total=%d, numeric=%d, name=%d, unmapped=%d",
-            totalXmltvChannels, mappedByNumericId, mappedByName, unmapped);
+            "pvr.xtreamcodes: XMLTV channel mapping: total=%d, epg_id=%d, numeric=%d, name=%d, unmapped=%d",
+            totalXmltvChannels, mappedByEpgId, mappedByNumericId, mappedByName, unmapped);
 
   // Second pass: Parse programme elements
   int programmeCount = 0;
