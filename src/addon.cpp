@@ -859,6 +859,19 @@ public:
         const std::string streamMimeType = (ToLower(streamFormat) == "hls")
                                             ? "application/vnd.apple.mpegurl"
                                             : "video/mp2t";
+        
+        // Optionally use inputstream.ffmpegdirect for better seeking support
+        if (settings.useFFmpegDirect)
+        {
+          properties.emplace_back(PVR_STREAM_PROPERTY_INPUTSTREAM, "inputstream.ffmpegdirect");
+          properties.emplace_back("inputstream.ffmpegdirect.stream_mode", "catchup");
+          properties.emplace_back("inputstream.ffmpegdirect.is_realtime_stream", "true");
+          // Pass start/end times so ffmpegdirect can calculate duration and seek correctly
+          properties.emplace_back("inputstream.ffmpegdirect.catchup_buffer_start_time", std::to_string(startTime));
+          properties.emplace_back("inputstream.ffmpegdirect.catchup_buffer_end_time", std::to_string(endTime));
+          kodi::Log(ADDON_LOG_INFO, "GetEPGTagStreamProperties: using inputstream.ffmpegdirect with catchup mode properties");
+        }
+        
         properties.emplace_back(PVR_STREAM_PROPERTY_STREAMURL, url);
         kodi::Log(ADDON_LOG_INFO, "GetEPGTagStreamProperties: added STREAMURL property");
         properties.emplace_back(PVR_STREAM_PROPERTY_ISREALTIMESTREAM, "false");

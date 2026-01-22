@@ -811,6 +811,7 @@ Settings LoadSettings()
   kodi::addon::GetSettingBoolean("enable_user_agent_spoofing", s.enableUserAgentSpoofing);
   kodi::addon::GetSettingString("custom_user_agent", s.customUserAgent);
   kodi::addon::GetSettingBoolean("enable_play_from_start", s.enablePlayFromStart);
+  kodi::addon::GetSettingBoolean("use_ffmpegdirect", s.useFFmpegDirect);
 
   // Kodi sometimes doesn't transfer settings to binary addons early during startup.
   // Always read persisted settings.xml from addon_data and overlay any values found.
@@ -832,6 +833,7 @@ Settings LoadSettings()
       if (ExtractSettingValue(xml, "custom_user_agent", tmp))
         s.customUserAgent = tmp;
       ExtractSettingBool(xml, "enable_play_from_start", s.enablePlayFromStart);
+      ExtractSettingBool(xml, "use_ffmpegdirect", s.useFFmpegDirect);
     }
   }
   return s;

@@ -102,6 +102,11 @@
           <default>true</default>
           <control type="toggle" />
         </setting>
+        <setting id="use_ffmpegdirect" type="boolean" label="30406" help="">
+          <level>0</level>
+          <default>false</default>
+          <control type="toggle" />
+        </setting>
       </group>
     </category>
 

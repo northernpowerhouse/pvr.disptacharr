@@ -20,6 +20,7 @@ struct Settings
   
   int catchupStartOffsetHours = 0;
   bool enablePlayFromStart = true;
+  bool useFFmpegDirect = false;
 };
 
 struct TestResult

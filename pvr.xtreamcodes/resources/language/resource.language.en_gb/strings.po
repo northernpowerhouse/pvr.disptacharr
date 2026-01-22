@@ -112,3 +112,7 @@ msgstr "{0:d} hours"
 msgctxt "#30405"
 msgid "Enable play from start for ongoing programs"
 msgstr "Enable play from start for ongoing programs"
+
+msgctxt "#30406"
+msgid "Use inputstream.ffmpegdirect for catchup (enables seeking)"
+msgstr "Use inputstream.ffmpegdirect for catchup (enables seeking)"
