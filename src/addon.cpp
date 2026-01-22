@@ -588,6 +588,10 @@ public:
     if (!uidToStream)
       return PVR_ERROR_UNKNOWN;
 
+    const std::string streamMimeType = (ToLower(streamFormat) == "hls")
+                                        ? "application/vnd.apple.mpegurl"
+                                        : "video/mp2t";
+
     // If we have a pending catchup URL from GetEPGTagStreamProperties, use it
     if (!pendingCatchupUrl.empty())
     {
@@ -595,6 +599,7 @@ public:
       properties.emplace_back(PVR_STREAM_PROPERTY_STREAMURL, pendingCatchupUrl);
       properties.emplace_back(PVR_STREAM_PROPERTY_ISREALTIMESTREAM, "false");
       properties.emplace_back(PVR_STREAM_PROPERTY_EPGPLAYBACKASLIVE, "false");
+      properties.emplace_back(PVR_STREAM_PROPERTY_MIMETYPE, streamMimeType);
       return PVR_ERROR_NO_ERROR;
     }
     kodi::Log(ADDON_LOG_INFO, "GetChannelStreamProperties: no pending catchup URL for channel %u, using LIVE", channel.GetUniqueId());
@@ -612,6 +617,7 @@ public:
     kodi::Log(ADDON_LOG_DEBUG, "GetChannelStreamProperties: using LIVE URL = %s", url.c_str());
     properties.emplace_back(PVR_STREAM_PROPERTY_STREAMURL, url);
     properties.emplace_back(PVR_STREAM_PROPERTY_ISREALTIMESTREAM, "true");
+    properties.emplace_back(PVR_STREAM_PROPERTY_MIMETYPE, streamMimeType);
     return PVR_ERROR_NO_ERROR;
   }
 
@@ -794,10 +800,14 @@ public:
         }
         kodi::Log(ADDON_LOG_INFO, "GetEPGTagStreamProperties: stored catchup URL for channel %u", channelUid);
         
+        const std::string streamMimeType = (ToLower(streamFormat) == "hls")
+                                            ? "application/vnd.apple.mpegurl"
+                                            : "video/mp2t";
         properties.emplace_back(PVR_STREAM_PROPERTY_STREAMURL, url);
         kodi::Log(ADDON_LOG_INFO, "GetEPGTagStreamProperties: added STREAMURL property");
         properties.emplace_back(PVR_STREAM_PROPERTY_ISREALTIMESTREAM, "false");
         properties.emplace_back(PVR_STREAM_PROPERTY_EPGPLAYBACKASLIVE, "false");
+        properties.emplace_back(PVR_STREAM_PROPERTY_MIMETYPE, streamMimeType);
         kodi::Log(ADDON_LOG_INFO, "GetEPGTagStreamProperties: returning SUCCESS with %d properties", (int)properties.size());
         return PVR_ERROR_NO_ERROR;
       }
