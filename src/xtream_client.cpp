@@ -982,14 +982,14 @@ std::string BuildCatchupUrl(const Settings& settings, int streamId, time_t start
   if (durationMinutes <= 0)
     return {};
 
-  // IMPORTANT: The Xtream server expects times in the XMLTV timezone, NOT UTC
-  // XMLTV times are in CET (UTC+1), so we need to add 1 hour to the UTC timestamp
-  // TODO: Parse and store the actual XMLTV timezone offset instead of hardcoding +1
-  time_t localAdjustedTime = adjustedStartTime + 3600; // Add 1 hour for CET timezone
+  // The Xtream server expects times in the same timezone as the EPG data.
+  // The EPG timestamps from Kodi are Unix timestamps (UTC epoch seconds).
+  // The Xtream API returns EPG times in UTC, so we use gmtime to format.
+  // No timezone adjustment is needed - the timestamp is already correct.
   
   // Format start time as YYYY-MM-DD:HH-MM (use gmtime_r for thread safety)
   std::tm tmBuf = {};
-  std::tm* tm = gmtime_r(&localAdjustedTime, &tmBuf);
+  std::tm* tm = gmtime_r(&adjustedStartTime, &tmBuf);
   if (!tm)
     return {};
 
