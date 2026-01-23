@@ -518,7 +518,7 @@ public:
       return PVR_ERROR_FAILED;
   }
 
-  PVR_ERROR GetTimerTypes(kodi::addon::PVRTimerTypeResultSet& results) override
+  PVR_ERROR GetTimerTypes(std::vector<kodi::addon::PVRTimerType>& types) override
   {
       using namespace kodi::addon;
       {
@@ -526,21 +526,21 @@ public:
           t.SetId(1);
           t.SetDescription("One-Time Recording");
           t.SetAttributes(PVR_TIMER_TYPE_IS_MANUAL); 
-          results.Add(t);
+          types.push_back(t);
       }
       {
           PVRTimerType t;
           t.SetId(2);
           t.SetDescription("Series Recording");
           t.SetAttributes(PVR_TIMER_TYPE_IS_MANUAL | PVR_TIMER_TYPE_FOR_SERIES_RECORDING); 
-          results.Add(t);
+          types.push_back(t);
       }
       {
           PVRTimerType t;
           t.SetId(3);
           t.SetDescription("Recurring Manual");
           t.SetAttributes(PVR_TIMER_TYPE_IS_MANUAL | PVR_TIMER_TYPE_IS_REPEATING); 
-          results.Add(t);
+          types.push_back(t);
       }
       return PVR_ERROR_NO_ERROR;
   }
