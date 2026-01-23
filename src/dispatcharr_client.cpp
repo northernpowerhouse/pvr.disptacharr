@@ -273,19 +273,24 @@ Client::HttpResponse Client::Request(const std::string& method, const std::strin
   
   file.CURLCreate(url);
   
-  // Headers
-  file.CURLAddOption(KODI_VFS_CURLOPT_HTTPHEADER, "Content-Type: application/json");
+  // Headers - use ADDON_CURL_OPTION_HEADER with name/value pairs
+  file.CURLAddOption(ADDON_CURL_OPTION_HEADER, "Content-Type", "application/json");
   if (!m_accessToken.empty()) {
-    std::string auth = "Authorization: Bearer " + m_accessToken;
-    file.CURLAddOption(KODI_VFS_CURLOPT_HTTPHEADER, auth.c_str());
+    file.CURLAddOption(ADDON_CURL_OPTION_HEADER, "Authorization", "Bearer " + m_accessToken);
   }
 
-  // Method
+  // Method - use postdata for POST body
   if (method == "POST") {
-    file.CURLAddOption(KODI_VFS_CURLOPT_CUSTOMREQUEST, "POST");
-    file.CURLAddOption(KODI_VFS_CURLOPT_POSTFIELDS, jsonBody);
+    file.CURLAddOption(ADDON_CURL_OPTION_PROTOCOL, "postdata", jsonBody);
   } else if (method == "DELETE") {
-    file.CURLAddOption(KODI_VFS_CURLOPT_CUSTOMREQUEST, "DELETE");
+    // For DELETE, we need to set custom request via URL or use a different approach
+    // Kodi's VFS doesn't directly support DELETE method, so we append to URL
+    url += "?_method=DELETE";
+    file.CURLCreate(url);
+    file.CURLAddOption(ADDON_CURL_OPTION_HEADER, "Content-Type", "application/json");
+    if (!m_accessToken.empty()) {
+      file.CURLAddOption(ADDON_CURL_OPTION_HEADER, "Authorization", "Bearer " + m_accessToken);
+    }
   }
 
   // Timeout
@@ -319,8 +324,8 @@ bool Client::EnsureToken()
   HttpResponse resp;
   kodi::vfs::CFile file;
   file.CURLCreate(GetBaseUrl() + "/api/accounts/token/");
-  file.CURLAddOption(KODI_VFS_CURLOPT_HTTPHEADER, "Content-Type: application/json");
-  file.CURLAddOption(KODI_VFS_CURLOPT_POSTFIELDS, ss.str().c_str());
+  file.CURLAddOption(ADDON_CURL_OPTION_HEADER, "Content-Type", "application/json");
+  file.CURLAddOption(ADDON_CURL_OPTION_PROTOCOL, "postdata", ss.str());
   
   if (file.CURLOpen(0)) {
     char buf[4096];
