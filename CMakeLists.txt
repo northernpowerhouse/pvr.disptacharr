@@ -95,6 +95,7 @@ else()
     add_library(${ADDON_ID} SHARED
       src/addon.cpp
       src/xtream_client.cpp
+      src/dispatcharr_client.cpp
       src/pugixml/pugixml.cpp
       src/win_locale_anchor.cpp
     )
@@ -102,6 +103,7 @@ else()
     add_library(${ADDON_ID} MODULE
       src/addon.cpp
       src/xtream_client.cpp
+      src/dispatcharr_client.cpp
       src/pugixml/pugixml.cpp
     )
   endif()
