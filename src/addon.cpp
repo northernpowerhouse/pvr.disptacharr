@@ -381,6 +381,11 @@ public:
 
     // We provide stream URLs and let Kodi handle playback.
     capabilities.SetHandlesInputStream(false);
+
+    // DVR/Recording support via Dispatcharr backend
+    capabilities.SetSupportsRecordings(true);
+    capabilities.SetSupportsTimers(true);
+
     return PVR_ERROR_NO_ERROR;
   }
 
@@ -516,6 +521,42 @@ public:
             return PVR_ERROR_NO_ERROR;
       } catch (...) {}
       return PVR_ERROR_FAILED;
+  }
+
+  PVR_ERROR GetRecordingStreamProperties(
+      const kodi::addon::PVRRecording& recording,
+      std::vector<kodi::addon::PVRStreamProperty>& properties) override
+  {
+    // Return the stream URL for playback.
+    // The Dispatcharr /api/channels/recordings/{id}/file/ endpoint allows anonymous access,
+    // so we can simply provide the URL directly without auth headers.
+    if (!m_dispatcharrClient)
+      return PVR_ERROR_SERVER_ERROR;
+
+    // Fetch recordings to get the stream URL for this recording ID
+    std::vector<dispatcharr::Recording> recordings;
+    if (!m_dispatcharrClient->FetchRecordings(recordings))
+    {
+      kodi::Log(ADDON_LOG_ERROR, "pvr.dispatcharr: Failed to fetch recordings for stream properties");
+      return PVR_ERROR_SERVER_ERROR;
+    }
+
+    const std::string recordingId = recording.GetRecordingId();
+    for (const auto& r : recordings)
+    {
+      if (std::to_string(r.id) == recordingId)
+      {
+        if (!r.streamUrl.empty())
+        {
+          properties.emplace_back(PVR_STREAM_PROPERTY_STREAMURL, r.streamUrl);
+          kodi::Log(ADDON_LOG_DEBUG, "pvr.dispatcharr: Recording stream URL: %s", r.streamUrl.c_str());
+        }
+        return PVR_ERROR_NO_ERROR;
+      }
+    }
+
+    kodi::Log(ADDON_LOG_WARNING, "pvr.dispatcharr: Recording %s not found", recordingId.c_str());
+    return PVR_ERROR_INVALID_PARAMETERS;
   }
 
   PVR_ERROR GetTimerTypes(std::vector<kodi::addon::PVRTimerType>& types) override
