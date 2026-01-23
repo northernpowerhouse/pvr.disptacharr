@@ -652,10 +652,10 @@ public:
   {
       if (!m_dispatcharrClient) return PVR_ERROR_SERVER_ERROR;
 
-      int typeId = timer.GetTimerTypeId();
+      unsigned int typeId = timer.GetTimerType();
       
       // Look up TVG ID for the channel
-      unsigned int chanUid = timer.GetChannelUid();
+      int chanUid = timer.GetClientChannelUid();
       std::string tvgId;
       
       {
