@@ -501,11 +501,11 @@ public:
        rec.SetRecordingId(std::to_string(r.id));
        rec.SetTitle(r.title.empty() ? "Unknown Recording" : r.title);
        rec.SetPlot(r.plot);
-       rec.SetStartTime(r.startTime);
+       rec.SetRecordingTime(r.startTime);
        int duration = static_cast<int>(r.endTime - r.startTime);
        rec.SetDuration(duration > 0 ? duration : 0);
-       rec.SetStreamURL(r.streamUrl);
-       rec.SetChannelUid(static_cast<unsigned int>(r.channelId)); 
+       // Stream URL is provided via GetRecordingStreamProperties
+       rec.SetChannelUid(static_cast<int>(r.channelId)); 
        
        results.Add(rec);
     }
@@ -573,7 +573,7 @@ public:
           PVRTimerType t;
           t.SetId(2);
           t.SetDescription("Series Recording");
-          t.SetAttributes(PVR_TIMER_TYPE_IS_MANUAL | PVR_TIMER_TYPE_FOR_SERIES_RECORDING); 
+          t.SetAttributes(PVR_TIMER_TYPE_IS_MANUAL | PVR_TIMER_TYPE_IS_REPEATING); 
           types.push_back(t);
       }
       {
@@ -593,16 +593,17 @@ public:
       // 1. Series Rules (Type 2)
       std::vector<dispatcharr::SeriesRule> series;
       if (m_dispatcharrClient->FetchSeriesRules(series)) {
+          unsigned int seriesIdx = 0;
           for (const auto& s : series) {
               kodi::addon::PVRTimer t;
-              // Use encoded ID to store info needed for delete
-              // Format: series|<tvg_id>
-              t.SetTimerId("series|" + s.tvgId); 
+              // Use index offset by 10000 for series rules
+              t.SetClientIndex(10000 + seriesIdx);
               t.SetTitle(s.title.empty() ? "All Shows" : s.title);
-              t.SetTimerTypeId(2); 
+              t.SetTimerType(2); 
               t.SetSummary(std::string("Mode: ") + s.mode + " (TVG: " + s.tvgId + ")");
               t.SetState(PVR_TIMER_STATE_SCHEDULED);
               results.Add(t);
+              seriesIdx++;
           }
       }
 
@@ -611,10 +612,11 @@ public:
       if (m_dispatcharrClient->FetchRecurringRules(recurring)) {
           for (const auto& r : recurring) {
               kodi::addon::PVRTimer t;
-              t.SetTimerId("rule|" + std::to_string(r.id));
+              // Use the rule ID offset by 20000 to avoid collision with series IDs
+              t.SetClientIndex(static_cast<unsigned int>(20000 + r.id));
               t.SetTitle(r.name.empty() ? "Recurring" : r.name);
-              t.SetTimerTypeId(3);
-              t.SetChannelUid(r.channelId);
+              t.SetTimerType(3);
+              t.SetClientChannelUid(r.channelId);
               t.SetState(r.enabled ? PVR_TIMER_STATE_SCHEDULED : PVR_TIMER_STATE_DISABLED);
               // Approximate next occurrence logic omitted for brevity, 
               // just showing it exists.
@@ -631,10 +633,11 @@ public:
               if (r.startTime <= now) continue; 
               
               kodi::addon::PVRTimer t;
-              t.SetTimerId("rec|" + std::to_string(r.id));
+              // Use the recording ID offset by 30000 to avoid collision
+              t.SetClientIndex(static_cast<unsigned int>(30000 + r.id));
               t.SetTitle(r.title);
-              t.SetTimerTypeId(1);
-              t.SetChannelUid(r.channelId);
+              t.SetTimerType(1);
+              t.SetClientChannelUid(r.channelId);
               t.SetStartTime(r.startTime);
               t.SetEndTime(r.endTime);
               t.SetState(PVR_TIMER_STATE_SCHEDULED);
@@ -722,25 +725,44 @@ public:
   {
       if (!m_dispatcharrClient) return PVR_ERROR_SERVER_ERROR;
 
-      std::string tid = timer.GetTimerId();
-      // Format: prefix|id
-      size_t pos = tid.find('|');
-      if (pos == std::string::npos) return PVR_ERROR_FAILED;
-
-      std::string type = tid.substr(0, pos);
-      std::string idVal = tid.substr(pos + 1);
-
-      if (type == "series") {
-          if (m_dispatcharrClient->DeleteSeriesRule(idVal)) return PVR_ERROR_NO_ERROR;
-      } else if (type == "rule") {
-          if (m_dispatcharrClient->DeleteRecurringRule(std::atoi(idVal.c_str()))) return PVR_ERROR_NO_ERROR;
-      } else if (type == "rec") {
-          // Cancel scheduled recording
-          if (m_dispatcharrClient->DeleteRecording(std::atoi(idVal.c_str()))) return PVR_ERROR_NO_ERROR;
+      unsigned int clientIndex = timer.GetClientIndex();
+      
+      // Determine type based on ID range:
+      // 10000-19999 = series rules
+      // 20000-29999 = recurring rules  
+      // 30000+ = scheduled recordings
+      
+      if (clientIndex >= 30000) {
+          // Scheduled recording - ID is clientIndex - 30000
+          int recId = static_cast<int>(clientIndex - 30000);
+          if (m_dispatcharrClient->DeleteRecording(recId)) 
+              return PVR_ERROR_NO_ERROR;
+      } else if (clientIndex >= 20000) {
+          // Recurring rule - ID is clientIndex - 20000
+          int ruleId = static_cast<int>(clientIndex - 20000);
+          if (m_dispatcharrClient->DeleteRecurringRule(ruleId)) 
+              return PVR_ERROR_NO_ERROR;
+      } else if (clientIndex >= 10000) {
+          // Series rule - need to look up by index since we use a counter
+          // This is tricky - we'd need to store a mapping. For now, fetch and match by position.
+          std::vector<dispatcharr::SeriesRule> series;
+          if (m_dispatcharrClient->FetchSeriesRules(series)) {
+              size_t idx = clientIndex - 10000;
+              if (idx < series.size()) {
+                  if (m_dispatcharrClient->DeleteSeriesRule(series[idx].tvgId))
+                      return PVR_ERROR_NO_ERROR;
+              }
+          }
       }
 
       return PVR_ERROR_FAILED;
   }
+
+  PVR_ERROR GetChannelGroupsAmount(int& amount) override
+  {
+    EnsureLoaded();
+
+    std::shared_ptr<const std::vector<std::string>> groupNames;
     bool groupsReady = false;
     {
       std::lock_guard<std::mutex> lock(m_mutex);
