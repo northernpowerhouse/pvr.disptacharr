@@ -866,7 +866,6 @@ public:
           properties.emplace_back(PVR_STREAM_PROPERTY_INPUTSTREAM, "inputstream.ffmpegdirect");
           properties.emplace_back("inputstream.ffmpegdirect.stream_mode", "catchup");
           properties.emplace_back("inputstream.ffmpegdirect.is_realtime_stream", "false");
-          properties.emplace_back("inputstream.ffmpegdirect.programme_catchup_id", std::to_string(tag.GetBroadcastId()));
           // Pass start/end times so ffmpegdirect can calculate duration and seek correctly
           properties.emplace_back("inputstream.ffmpegdirect.catchup_buffer_start_time", std::to_string(startTime));
           properties.emplace_back("inputstream.ffmpegdirect.catchup_buffer_end_time", std::to_string(endTime));
