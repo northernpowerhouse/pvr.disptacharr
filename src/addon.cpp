@@ -874,19 +874,15 @@ public:
         if (settings.useFFmpegDirect)
         {
           properties.emplace_back(PVR_STREAM_PROPERTY_INPUTSTREAM, "inputstream.ffmpegdirect");
-          properties.emplace_back("inputstream.ffmpegdirect.stream_mode", "catchup");
-          // Treat catchup playback as non-realtime to ensure fixed duration
+          // Use timeshift mode: the Xtream server supports HTTP Range requests,
+          // so ffmpegdirect can seek within the stream using byte ranges rather
+          // than needing to rebuild URLs with catchup placeholders.
+          properties.emplace_back("inputstream.ffmpegdirect.stream_mode", "timeshift");
+          // Treat as non-realtime so duration is treated as fixed
           properties.emplace_back("inputstream.ffmpegdirect.is_realtime_stream", "false");
-          // Explicitly pass start/end times in epoch seconds
-          properties.emplace_back("inputstream.ffmpegdirect.catchup_buffer_start_time", std::to_string(startTime));
-          properties.emplace_back("inputstream.ffmpegdirect.catchup_buffer_end_time", std::to_string(effectiveEnd));
-          // Terminate at programme end and avoid auto-jumping between EPG entries
-          properties.emplace_back("inputstream.ffmpegdirect.catchup_terminates", "true");
-          // No timezone shift applied; EPG times assumed to be UTC epoch seconds
-          properties.emplace_back("inputstream.ffmpegdirect.timezone_shift", "0");
           // Help ffmpegdirect avoid probing by giving mimetype explicitly
           properties.emplace_back(PVR_STREAM_PROPERTY_MIMETYPE, streamMimeType);
-          kodi::Log(ADDON_LOG_INFO, "GetEPGTagStreamProperties: using inputstream.ffmpegdirect with catchup mode properties");
+          kodi::Log(ADDON_LOG_INFO, "GetEPGTagStreamProperties: using inputstream.ffmpegdirect with timeshift mode (HTTP Range seeking)");
         }
         
         properties.emplace_back(PVR_STREAM_PROPERTY_STREAMURL, url);
