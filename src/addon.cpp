@@ -873,22 +873,49 @@ public:
         // Optionally use inputstream.ffmpegdirect for better seeking support
         if (settings.useFFmpegDirect)
         {
+          // Calculate programme duration in minutes for the URL template
+          const int programDurationMinutes = static_cast<int>((effectiveEnd - startTime) / 60);
+          
+          // Build a URL template with ffmpegdirect placeholders for seeking
+          const std::string templateUrl = xtream::BuildCatchupUrlTemplate(
+              settings, stream.id, programDurationMinutes, streamFormat);
+          
+          if (templateUrl.empty())
+          {
+            kodi::Log(ADDON_LOG_ERROR, "GetEPGTagStreamProperties: catchup URL template is EMPTY");
+            return PVR_ERROR_UNKNOWN;
+          }
+          
+          kodi::Log(ADDON_LOG_INFO, "GetEPGTagStreamProperties: catchup URL template = %s", templateUrl.c_str());
+          
           properties.emplace_back(PVR_STREAM_PROPERTY_INPUTSTREAM, "inputstream.ffmpegdirect");
-          // Use timeshift mode: the Xtream server supports HTTP Range requests,
-          // so ffmpegdirect can seek within the stream using byte ranges rather
-          // than needing to rebuild URLs with catchup placeholders.
-          properties.emplace_back("inputstream.ffmpegdirect.stream_mode", "timeshift");
-          // Treat as non-realtime so duration is treated as fixed
+          // Use catchup mode with URL template - ffmpegdirect substitutes placeholders when seeking
+          properties.emplace_back("inputstream.ffmpegdirect.stream_mode", "catchup");
+          // The default URL is used for initial playback (concrete URL with actual start time)
+          properties.emplace_back("inputstream.ffmpegdirect.default_url", url);
+          // The catchup URL format string contains placeholders for seeking
+          properties.emplace_back("inputstream.ffmpegdirect.catchup_url_format_string", templateUrl);
+          // Buffer boundaries in epoch seconds
+          properties.emplace_back("inputstream.ffmpegdirect.catchup_buffer_start_time", std::to_string(startTime));
+          properties.emplace_back("inputstream.ffmpegdirect.catchup_buffer_end_time", std::to_string(effectiveEnd));
+          // Terminate at programme end to avoid auto-jumping to next EPG entry
+          properties.emplace_back("inputstream.ffmpegdirect.catchup_terminates", "true");
+          // Treat as non-realtime so duration is fixed
           properties.emplace_back("inputstream.ffmpegdirect.is_realtime_stream", "false");
+          // Timezone offset (0 = UTC, ffmpegdirect applies this to placeholder substitution)
+          properties.emplace_back("inputstream.ffmpegdirect.timezone_shift", "0");
           // Help ffmpegdirect avoid probing by giving mimetype explicitly
           properties.emplace_back(PVR_STREAM_PROPERTY_MIMETYPE, streamMimeType);
-          kodi::Log(ADDON_LOG_INFO, "GetEPGTagStreamProperties: using inputstream.ffmpegdirect with timeshift mode (HTTP Range seeking)");
+          // Use the concrete URL for initial stream open
+          properties.emplace_back(PVR_STREAM_PROPERTY_STREAMURL, url);
+          
+          kodi::Log(ADDON_LOG_INFO, "GetEPGTagStreamProperties: using inputstream.ffmpegdirect catchup mode with URL template");
         }
-        
-        properties.emplace_back(PVR_STREAM_PROPERTY_STREAMURL, url);
-        // Also include mimetype for core/Kodi when not using ffmpegdirect
-        if (!settings.useFFmpegDirect)
+        else
+        {
+          properties.emplace_back(PVR_STREAM_PROPERTY_STREAMURL, url);
           properties.emplace_back(PVR_STREAM_PROPERTY_MIMETYPE, streamMimeType);
+        }
         kodi::Log(ADDON_LOG_INFO, "GetEPGTagStreamProperties: added STREAMURL property");
         properties.emplace_back(PVR_STREAM_PROPERTY_ISREALTIMESTREAM, "false");
         properties.emplace_back(PVR_STREAM_PROPERTY_EPGPLAYBACKASLIVE, "false");

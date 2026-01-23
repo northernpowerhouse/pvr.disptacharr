@@ -1029,6 +1029,26 @@ std::string BuildCatchupUrl(const Settings& settings, int streamId, time_t start
   return AppendUserAgentHeader(url, settings);
 }
 
+std::string BuildCatchupUrlTemplate(const Settings& settings, int streamId, int durationMinutes, const std::string& streamFormat)
+{
+  // Build a URL template with ffmpegdirect placeholders for catchup seeking.
+  // ffmpegdirect will substitute {Y}, {m}, {d}, {H}, {M} with the seek position's date/time.
+  const std::string base = BuildBaseUrl(settings);
+  if (base.empty() || streamId <= 0 || durationMinutes <= 0)
+    return {};
+
+  std::string ext = ".ts";
+  if (ToLower(streamFormat) == "hls")
+    ext = ".m3u8";
+
+  // Format: server:port/timeshift/user/pass/durationinminutes/{Y}-{m}-{d}:{H}-{M}/streamid.ts
+  // The placeholders {Y}, {m}, {d}, {H}, {M} are substituted by ffmpegdirect when seeking.
+  std::string url = base + "/timeshift/" + UrlEncode(settings.username) + "/" +
+                    UrlEncode(settings.password) + "/" + std::to_string(durationMinutes) + "/" +
+                    "{Y}-{m}-{d}:{H}-{M}/" + std::to_string(streamId) + ext;
+  return AppendUserAgentHeader(url, settings);
+}
+
 FetchResult FetchXMLTVEpg(const Settings& settings, std::string& xmltvData)
 {
   xmltvData.clear();
