@@ -658,14 +658,14 @@ public:
         
         if (!catchupTemplate.empty())
         {
-          properties.emplace_back("inputstream.ffmpegdirect.stream_mode", "timeshift");
+          properties.emplace_back("inputstream.ffmpegdirect.stream_mode", "catchup");
           properties.emplace_back("inputstream.ffmpegdirect.default_url", url);
           properties.emplace_back("inputstream.ffmpegdirect.catchup_url_format_string", catchupTemplate);
           properties.emplace_back("inputstream.ffmpegdirect.catchup_buffer_start_time", std::to_string(archiveStart));
           properties.emplace_back("inputstream.ffmpegdirect.catchup_buffer_end_time", std::to_string(archiveEnd));
           properties.emplace_back("inputstream.ffmpegdirect.catchup_terminates", "true");
           properties.emplace_back("inputstream.ffmpegdirect.timezone_shift", "0");
-          kodi::Log(ADDON_LOG_INFO, "GetChannelStreamProperties: using live stream with catchup backward seeking");
+          kodi::Log(ADDON_LOG_INFO, "GetChannelStreamProperties: using live stream with catchup mode for backward seeking beyond buffer");
         }
         else
         {
