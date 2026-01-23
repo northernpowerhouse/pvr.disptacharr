@@ -667,6 +667,8 @@ public:
           // For live streams, we must NOT terminate at the buffer end time, as the stream continues.
           // Setting this to true causes crashes/EOF behavior when the live edge is reached.
           properties.emplace_back("inputstream.ffmpegdirect.catchup_terminates", "false");
+          // Explicitly state this is a realtime stream to prevent ffmpegdirect from treating it as finite
+          properties.emplace_back("inputstream.ffmpegdirect.is_realtime_stream", "true");
           
           properties.emplace_back("inputstream.ffmpegdirect.timezone_shift", "0");
           kodi::Log(ADDON_LOG_INFO, "GetChannelStreamProperties: using live stream with catchup mode for backward seeking beyond buffer");
