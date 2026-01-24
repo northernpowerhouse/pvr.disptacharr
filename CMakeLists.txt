@@ -73,26 +73,7 @@ else()
   message(STATUS "Found CURL: ${CURL_LIBRARIES}")
   message(STATUS "CURL include dirs: ${CURL_INCLUDE_DIRS}")
 
-  # Add std::locale test executable on Windows to diagnose linking issues
-  # This can run without KODI_ADDON_SDK to isolate the linking problem
-  if(WIN32)
-    add_executable(locale_test test_locale.cpp)
-    if(MSVC)
-      set_target_properties(locale_test PROPERTIES
-        MSVC_RUNTIME_LIBRARY "MultiThreadedDLL"
-      )
-      # Explicitly add /MD flag to ensure dynamic CRT linking
-      target_compile_options(locale_test PRIVATE /MD /EHsc /GR)
-      target_compile_definitions(locale_test PRIVATE 
-        _CRT_SECURE_NO_WARNINGS
-        WIN32_LEAN_AND_MEAN
-        NOMINMAX
-      )
-      target_link_options(locale_test PRIVATE /VERBOSE:LIB)
-    endif()
-  endif()
-
-  # KODI_ADDON_SDK only needed for the main addon, not for the locale test
+  # KODI_ADDON_SDK only needed for the main addon
   if(NOT DEFINED KODI_ADDON_SDK)
     message(FATAL_ERROR "KODI_ADDON_SDK not set. Configure with -DKODI_ADDON_SDK=/path/to/kodi-addon-dev-kit")
   endif()
@@ -107,7 +88,6 @@ else()
       src/xtream_client.cpp
       src/dispatcharr_client.cpp
       src/pugixml/pugixml.cpp
-      src/win_locale_anchor.cpp
     )
   else()
     add_library(${ADDON_ID} MODULE
