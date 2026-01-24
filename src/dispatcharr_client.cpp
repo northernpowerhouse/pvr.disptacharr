@@ -561,7 +561,8 @@ bool Client::AddRecurringRule(const RecurringRule& rule)
   ss << "]}";
   
   auto resp = Request("POST", "/api/channels/recurring-rules/", ss.str());
-  bool success = resp.statusCode == 200 && resp.body.find("\"id\"") != std::string::npos;
+  // HTTP 201 Created is the correct success response for POST
+  bool success = (resp.statusCode == 200 || resp.statusCode == 201) && resp.body.find("\"id\"") != std::string::npos;
   kodi::Log(success ? ADDON_LOG_DEBUG : ADDON_LOG_ERROR, 
             "pvr.dispatcharr: AddRecurringRule result - success=%d, body=%s", 
             success, resp.body.substr(0, 200).c_str());
@@ -684,7 +685,8 @@ bool Client::ScheduleRecording(int channelId, time_t startTime, time_t endTime, 
      << ",\"custom_properties\":{\"program\":{\"title\":\"" << JsonEscape(title) << "\"}} }";
   
   auto resp = Request("POST", "/api/channels/recordings/", ss.str());
-  return resp.statusCode == 200;
+  // HTTP 201 Created is the correct success response for POST
+  return resp.statusCode == 200 || resp.statusCode == 201;
 }
 
 } // namespace dispatcharr
