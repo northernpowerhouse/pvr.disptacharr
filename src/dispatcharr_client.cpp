@@ -670,6 +670,8 @@ bool Client::FetchRecordings(std::vector<Recording>& outRecordings)
               ExtractStringField(programObj, "title", r.title);
               ExtractStringField(programObj, "description", r.plot);
           }
+          // Extract status: "scheduled", "recording", "completed", "interrupted"
+          ExtractStringField(customProps, "status", r.status);
       }
       
       // Stream URL

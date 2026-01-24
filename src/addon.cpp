@@ -489,12 +489,14 @@ public:
     // Dispatcharr "recordings" endpoint returns ALL (past and future/scheduled).
     // Kodi `GetRecordings` expects completed or in-progress recordings. 
     // Future ones should go to `GetTimers`.
-    // We'll filter by StartTime <= Now.
-    time_t now = time(nullptr);
+    // We filter by status: only show "completed" or "recording" (in-progress)
+    // "scheduled" recordings go to the timers list, not recordings list.
 
     for (const auto& r : recordings)
     {
-       if (r.startTime > now) 
+       // Only show completed recordings in the recordings list
+       // In-progress ("recording") might work but file may be incomplete
+       if (r.status != "completed" && r.status != "interrupted") 
          continue;
 
        kodi::addon::PVRRecording rec;
@@ -662,12 +664,13 @@ public:
       // 3. Scheduled Recordings (Type 1)
       std::vector<dispatcharr::Recording> recs;
       if (m_dispatcharrClient->FetchRecordings(recs)) {
-          time_t now = time(nullptr);
-          int futureCount = 0;
+          int timerCount = 0;
           for (const auto& r : recs) {
-              // Skip recordings that have already ended
-              if (r.endTime <= now) continue; 
-              futureCount++;
+              // Only show scheduled or in-progress recordings in timers list
+              // Completed recordings go to GetRecordings, not here
+              if (r.status != "scheduled" && r.status != "recording") 
+                  continue;
+              timerCount++;
               
               kodi::addon::PVRTimer t;
               // Use the recording ID offset by 30000 to avoid collision
@@ -681,10 +684,15 @@ public:
               }
               t.SetStartTime(r.startTime);
               t.SetEndTime(r.endTime);
-              t.SetState(PVR_TIMER_STATE_SCHEDULED);
+              // Set appropriate state based on status
+              if (r.status == "recording") {
+                  t.SetState(PVR_TIMER_STATE_RECORDING);
+              } else {
+                  t.SetState(PVR_TIMER_STATE_SCHEDULED);
+              }
               results.Add(t);
           }
-          kodi::Log(ADDON_LOG_DEBUG, "pvr.dispatcharr: GetTimers - fetched %zu recordings, %d future", recs.size(), futureCount);
+          kodi::Log(ADDON_LOG_DEBUG, "pvr.dispatcharr: GetTimers - fetched %zu recordings, %d as timers", recs.size(), timerCount);
       }
       
       kodi::Log(ADDON_LOG_DEBUG, "pvr.dispatcharr: GetTimers complete");
