@@ -123,6 +123,14 @@ else()
     )
     # Exception handling and RTTI  
     target_compile_options(${ADDON_ID} PRIVATE /EHsc /GR)
+    # Linker options to handle weak/COMDAT symbols from multiple translation units
+    # The _Avx2WmemEnabledWeakValue symbol is emitted by MSVC for CPU feature detection
+    # These are "weak" symbols that should be allowed to have multiple definitions
+    target_link_options(${ADDON_ID} PRIVATE 
+      /OPT:REF 
+      /OPT:ICF
+      /FORCE:MULTIPLE
+    )
     # Define common Windows macros
     target_compile_definitions(${ADDON_ID} PRIVATE 
       _CRT_SECURE_NO_WARNINGS
