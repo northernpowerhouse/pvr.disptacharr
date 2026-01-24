@@ -1,7 +1,14 @@
 cmake_minimum_required(VERSION 3.15)
 
-# For Windows, set CRT before project() to ensure consistency
-if(WIN32 AND MSVC)
+# For Windows with vcpkg, ensure we use the static-md triplet (static libs, dynamic CRT)
+if(WIN32)
+  # Set the vcpkg triplet if using vcpkg toolchain
+  if(DEFINED CMAKE_TOOLCHAIN_FILE AND CMAKE_TOOLCHAIN_FILE MATCHES "vcpkg")
+    if(NOT DEFINED VCPKG_TARGET_TRIPLET)
+      set(VCPKG_TARGET_TRIPLET "x64-windows-static-md" CACHE STRING "")
+    endif()
+  endif()
+  # Force dynamic CRT for MSVC
   set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreadedDLL" CACHE STRING "" FORCE)
 endif()
 
@@ -110,24 +117,18 @@ else()
   set_target_properties(${ADDON_ID} PROPERTIES PREFIX "")
 
   if(WIN32)
-    # Use dynamic CRT via CMake property
+    # Use dynamic CRT via CMake property (matches vcpkg x64-windows-static-md triplet)
     set_target_properties(${ADDON_ID} PROPERTIES
       MSVC_RUNTIME_LIBRARY "MultiThreadedDLL"
     )
-    # Exception handling and RTTI
+    # Exception handling and RTTI  
     target_compile_options(${ADDON_ID} PRIVATE /EHsc /GR)
     # Define common Windows macros
     target_compile_definitions(${ADDON_ID} PRIVATE 
       _CRT_SECURE_NO_WARNINGS
       WIN32_LEAN_AND_MEAN
       NOMINMAX
-    )
-    # Ignore static CRT libraries that may conflict, force dynamic linking
-    target_link_options(${ADDON_ID} PRIVATE 
-      /NODEFAULTLIB:libcmt.lib
-      /NODEFAULTLIB:libcmtd.lib
-      /NODEFAULTLIB:libcpmt.lib
-      /NODEFAULTLIB:libcpmtd.lib
+      CURL_STATICLIB
     )
   endif()
 
