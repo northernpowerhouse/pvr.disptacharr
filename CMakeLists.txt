@@ -110,22 +110,25 @@ else()
   set_target_properties(${ADDON_ID} PROPERTIES PREFIX "")
 
   if(WIN32)
-    # Use dynamic CRT - set at target level too
+    # Use dynamic CRT via CMake property
     set_target_properties(${ADDON_ID} PROPERTIES
       MSVC_RUNTIME_LIBRARY "MultiThreadedDLL"
     )
-    # Explicitly add /MD to ensure dynamic CRT, plus exception handling and RTTI
-    # The MSVC_RUNTIME_LIBRARY property should do this, but being explicit matches the working test
-    # Also enable /showIncludes to trace header inclusion order to diagnose inconsistent dll linkage
-    target_compile_options(${ADDON_ID} PRIVATE /MD /EHsc /GR /showIncludes)
-    # Define common Windows macros; ensure dynamic CRT (_DLL via /MD)
+    # Exception handling and RTTI
+    target_compile_options(${ADDON_ID} PRIVATE /EHsc /GR)
+    # Define common Windows macros
     target_compile_definitions(${ADDON_ID} PRIVATE 
       _CRT_SECURE_NO_WARNINGS
       WIN32_LEAN_AND_MEAN
       NOMINMAX
     )
-    # Add verbose linker output to diagnose link issues
-    target_link_options(${ADDON_ID} PRIVATE /VERBOSE:LIB)
+    # Ignore static CRT libraries that may conflict, force dynamic linking
+    target_link_options(${ADDON_ID} PRIVATE 
+      /NODEFAULTLIB:libcmt.lib
+      /NODEFAULTLIB:libcmtd.lib
+      /NODEFAULTLIB:libcpmt.lib
+      /NODEFAULTLIB:libcpmtd.lib
+    )
   endif()
 
   # CMAKE_MSVC_RUNTIME_LIBRARY property automatically handles CRT linkage
