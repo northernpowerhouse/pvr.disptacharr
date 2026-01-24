@@ -1,7 +1,7 @@
 #include "dispatcharr_client.h"
 
-#include <kodi/Filesystem.h>
 #include <kodi/General.h>
+#include <curl/curl.h>
 
 #include <algorithm>
 #include <cctype>
@@ -14,27 +14,17 @@
 #include <string_view>
 #include <vector>
 
-// URL encoding (percent encoding) for CURL postdata
-// Kodi's VFS parses | and & as delimiters, so JSON characters must be escaped
+// libcurl write callback for response data
 namespace {
 
-std::string UrlEncode(const std::string& input) {
-  std::ostringstream encoded;
-  encoded.fill('0');
-  encoded << std::hex << std::uppercase;
-  
-  for (unsigned char c : input) {
-    // Unreserved characters (RFC 3986): ALPHA, DIGIT, -, ., _, ~
-    if (std::isalnum(c) || c == '-' || c == '.' || c == '_' || c == '~') {
-      encoded << c;
-    } else {
-      // Percent-encode everything else
-      encoded << '%' << std::setw(2) << static_cast<int>(c);
-    }
-  }
-  
-  return encoded.str();
+static size_t WriteCallback(void* contents, size_t size, size_t nmemb, void* userp)
+{
+  size_t totalSize = size * nmemb;
+  std::string* str = static_cast<std::string*>(userp);
+  str->append(static_cast<char*>(contents), totalSize);
+  return totalSize;
 }
+
 } // anonymous namespace
 
 namespace dispatcharr
@@ -315,7 +305,6 @@ std::string Client::GetBaseUrl() const
 Client::HttpResponse Client::Request(const std::string& method, const std::string& endpoint, const std::string& jsonBody)
 {
   HttpResponse resp;
-  kodi::vfs::CFile file;
   std::string url = GetBaseUrl() + endpoint;
   
   kodi::Log(ADDON_LOG_DEBUG, "pvr.dispatcharr: Request %s %s", method.c_str(), url.c_str());
@@ -323,51 +312,63 @@ Client::HttpResponse Client::Request(const std::string& method, const std::strin
     kodi::Log(ADDON_LOG_DEBUG, "pvr.dispatcharr: Request body: %s", jsonBody.c_str());
   }
   
-  file.CURLCreate(url);
-
+  CURL* curl = curl_easy_init();
+  if (!curl) {
+    kodi::Log(ADDON_LOG_ERROR, "pvr.dispatcharr: Failed to init curl");
+    resp.statusCode = 0;
+    return resp;
+  }
   
-  // Headers - use ADDON_CURL_OPTION_HEADER with name/value pairs
-  file.CURLAddOption(ADDON_CURL_OPTION_HEADER, "Content-Type", "application/json");
+  // Set URL
+  curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
+  
+  // Set timeout
+  curl_easy_setopt(curl, CURLOPT_TIMEOUT, static_cast<long>(m_settings.timeoutSeconds));
+  
+  // Set write callback
+  curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, WriteCallback);
+  curl_easy_setopt(curl, CURLOPT_WRITEDATA, &resp.body);
+  
+  // Set headers
+  struct curl_slist* headers = nullptr;
+  headers = curl_slist_append(headers, "Content-Type: application/json");
+  headers = curl_slist_append(headers, "Accept: application/json");
   if (!m_accessToken.empty()) {
-    file.CURLAddOption(ADDON_CURL_OPTION_HEADER, "Authorization", "Bearer " + m_accessToken);
+    std::string authHeader = "Authorization: Bearer " + m_accessToken;
+    headers = curl_slist_append(headers, authHeader.c_str());
   }
-
-  // Method - use postdata for POST body (Kodi requires URL/percent encoding)
-  if (method == "POST") {
-    std::string encodedBody = UrlEncode(jsonBody);
-    file.CURLAddOption(ADDON_CURL_OPTION_PROTOCOL, "postdata", encodedBody);
-  } else if (method == "DELETE") {
-    // For DELETE, we need to set custom request via URL or use a different approach
-    // Kodi's VFS doesn't directly support DELETE method, so we append to URL
-    url += "?_method=DELETE";
-    file.CURLCreate(url);
-    file.CURLAddOption(ADDON_CURL_OPTION_HEADER, "Content-Type", "application/json");
-    if (!m_accessToken.empty()) {
-      file.CURLAddOption(ADDON_CURL_OPTION_HEADER, "Authorization", "Bearer " + m_accessToken);
-    }
-  }
+  curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
   
-  // Allow reading error responses
-  file.CURLAddOption(ADDON_CURL_OPTION_PROTOCOL, "failonerror", "false");
-
-  // Timeout
-  // file.CURLAddOption(KODI_VFS_CURLOPT_TIMEOUT, m_settings.timeoutSeconds);
-
-  if (file.CURLOpen(0)) {
-    char buf[4096];
-    while (true) {
-      ssize_t read = file.Read(buf, sizeof(buf));
-      if (read <= 0) break;
-      resp.body.append(buf, read);
-    }
-    file.Close();
-    // CURLOpen success - assume 200 for now (Kodi VFS doesn't expose actual status code easily)
-    resp.statusCode = 200; 
+  // Set method and body
+  if (method == "POST") {
+    curl_easy_setopt(curl, CURLOPT_POST, 1L);
+    curl_easy_setopt(curl, CURLOPT_POSTFIELDS, jsonBody.c_str());
+    curl_easy_setopt(curl, CURLOPT_POSTFIELDSIZE, static_cast<long>(jsonBody.size()));
+  } else if (method == "DELETE") {
+    curl_easy_setopt(curl, CURLOPT_CUSTOMREQUEST, "DELETE");
+  } else if (method == "PUT") {
+    curl_easy_setopt(curl, CURLOPT_CUSTOMREQUEST, "PUT");
+    curl_easy_setopt(curl, CURLOPT_POSTFIELDS, jsonBody.c_str());
+    curl_easy_setopt(curl, CURLOPT_POSTFIELDSIZE, static_cast<long>(jsonBody.size()));
+  }
+  // GET is the default
+  
+  // Perform request
+  CURLcode res = curl_easy_perform(curl);
+  
+  if (res == CURLE_OK) {
+    long httpCode = 0;
+    curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &httpCode);
+    resp.statusCode = static_cast<int>(httpCode);
+    kodi::Log(ADDON_LOG_DEBUG, "pvr.dispatcharr: Response code: %d", resp.statusCode);
     kodi::Log(ADDON_LOG_DEBUG, "pvr.dispatcharr: Response: %s", resp.body.substr(0, 500).c_str());
   } else {
+    kodi::Log(ADDON_LOG_ERROR, "pvr.dispatcharr: curl_easy_perform failed: %s", curl_easy_strerror(res));
     resp.statusCode = 0;
-    kodi::Log(ADDON_LOG_ERROR, "pvr.dispatcharr: Request failed - CURLOpen returned false");
   }
+  
+  curl_slist_free_all(headers);
+  curl_easy_cleanup(curl);
   
   return resp;
 }
@@ -386,43 +387,63 @@ bool Client::EnsureToken()
   kodi::Log(ADDON_LOG_DEBUG, "pvr.dispatcharr: EnsureToken - Username: %s", m_settings.username.c_str());
   kodi::Log(ADDON_LOG_DEBUG, "pvr.dispatcharr: EnsureToken - POST body: %s", jsonBody.c_str());
   
-  // Bypass Request() to avoid recursion and auth header
-  HttpResponse resp;
-  kodi::vfs::CFile file;
-  file.CURLCreate(url);
-  file.CURLAddOption(ADDON_CURL_OPTION_HEADER, "Content-Type", "application/json");
-  file.CURLAddOption(ADDON_CURL_OPTION_HEADER, "Accept", "application/json");
-  // Kodi requires postdata to be URL/percent encoded
-  std::string encodedBody = UrlEncode(jsonBody);
-  file.CURLAddOption(ADDON_CURL_OPTION_PROTOCOL, "postdata", encodedBody);
-  // Allow reading error responses
-  file.CURLAddOption(ADDON_CURL_OPTION_PROTOCOL, "failonerror", "false");
-  
-  if (file.CURLOpen(0)) {
-    char buf[4096];
-    while (true) {
-      ssize_t read = file.Read(buf, sizeof(buf));
-      if (read <= 0) break;
-      resp.body.append(buf, read);
-    }
-    file.Close();
-    
-    kodi::Log(ADDON_LOG_DEBUG, "pvr.dispatcharr: EnsureToken - Response body length: %zu", resp.body.size());
-    kodi::Log(ADDON_LOG_DEBUG, "pvr.dispatcharr: EnsureToken - Response body (first 500 chars): %s", resp.body.substr(0, 500).c_str());
-    
-    // Parse
-    std::string token;
-    if (ExtractStringField(resp.body, "access", token) && !token.empty()) {
-      m_accessToken = token;
-      kodi::Log(ADDON_LOG_DEBUG, "pvr.dispatcharr: EnsureToken - Successfully extracted access token (length: %zu)", token.size());
-      return true;
-    }
-    kodi::Log(ADDON_LOG_ERROR, "pvr.dispatcharr: EnsureToken - Failed to extract access token from response");
-  } else {
-    kodi::Log(ADDON_LOG_ERROR, "pvr.dispatcharr: EnsureToken - CURLOpen failed");
+  // Use libcurl directly for authentication
+  CURL* curl = curl_easy_init();
+  if (!curl) {
+    kodi::Log(ADDON_LOG_ERROR, "pvr.dispatcharr: EnsureToken - Failed to init curl");
+    return false;
   }
-  kodi::Log(ADDON_LOG_ERROR, "pvr.dispatcharr: Failed to authenticate user %s", m_settings.username.c_str());
-  return false;
+  
+  std::string responseBody;
+  
+  curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
+  curl_easy_setopt(curl, CURLOPT_TIMEOUT, static_cast<long>(m_settings.timeoutSeconds));
+  curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, WriteCallback);
+  curl_easy_setopt(curl, CURLOPT_WRITEDATA, &responseBody);
+  
+  struct curl_slist* headers = nullptr;
+  headers = curl_slist_append(headers, "Content-Type: application/json");
+  headers = curl_slist_append(headers, "Accept: application/json");
+  curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
+  
+  curl_easy_setopt(curl, CURLOPT_POST, 1L);
+  curl_easy_setopt(curl, CURLOPT_POSTFIELDS, jsonBody.c_str());
+  curl_easy_setopt(curl, CURLOPT_POSTFIELDSIZE, static_cast<long>(jsonBody.size()));
+  
+  CURLcode res = curl_easy_perform(curl);
+  
+  bool success = false;
+  if (res == CURLE_OK) {
+    long httpCode = 0;
+    curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &httpCode);
+    
+    kodi::Log(ADDON_LOG_DEBUG, "pvr.dispatcharr: EnsureToken - HTTP code: %ld", httpCode);
+    kodi::Log(ADDON_LOG_DEBUG, "pvr.dispatcharr: EnsureToken - Response body length: %zu", responseBody.size());
+    kodi::Log(ADDON_LOG_DEBUG, "pvr.dispatcharr: EnsureToken - Response body (first 500 chars): %s", responseBody.substr(0, 500).c_str());
+    
+    if (httpCode == 200) {
+      std::string token;
+      if (ExtractStringField(responseBody, "access", token) && !token.empty()) {
+        m_accessToken = token;
+        kodi::Log(ADDON_LOG_DEBUG, "pvr.dispatcharr: EnsureToken - Successfully extracted access token (length: %zu)", token.size());
+        success = true;
+      } else {
+        kodi::Log(ADDON_LOG_ERROR, "pvr.dispatcharr: EnsureToken - Failed to extract access token from response");
+      }
+    } else {
+      kodi::Log(ADDON_LOG_ERROR, "pvr.dispatcharr: EnsureToken - HTTP error %ld: %s", httpCode, responseBody.c_str());
+    }
+  } else {
+    kodi::Log(ADDON_LOG_ERROR, "pvr.dispatcharr: EnsureToken - curl_easy_perform failed: %s", curl_easy_strerror(res));
+  }
+  
+  curl_slist_free_all(headers);
+  curl_easy_cleanup(curl);
+  
+  if (!success) {
+    kodi::Log(ADDON_LOG_ERROR, "pvr.dispatcharr: Failed to authenticate user %s", m_settings.username.c_str());
+  }
+  return success;
 }
 
 bool Client::FetchSeriesRules(std::vector<SeriesRule>& outRules)

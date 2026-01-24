@@ -19,19 +19,24 @@ if(Kodi_FOUND)
   set(CMAKE_CXX_STANDARD 17)
   set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+  # Find libcurl (Kodi exports this, but we need headers)
+  find_package(CURL REQUIRED)
+  
   # Try to find system pugixml, otherwise use bundled version
   find_package(pugixml QUIET)
   
   if(pugixml_FOUND)
     message(STATUS "Using system pugixml")
     include_directories(${KODI_INCLUDE_DIR}/..
-                        ${PUGIXML_INCLUDE_DIRS})
-    set(DEPLIBS ${PUGIXML_LIBRARIES})
+                        ${PUGIXML_INCLUDE_DIRS}
+                        ${CURL_INCLUDE_DIRS})
+    set(DEPLIBS ${PUGIXML_LIBRARIES} ${CURL_LIBRARIES})
   else()
     message(STATUS "Using bundled pugixml")
     include_directories(${KODI_INCLUDE_DIR}/..
-                        ${CMAKE_SOURCE_DIR}/src/pugixml)
-    set(DEPLIBS "")
+                        ${CMAKE_SOURCE_DIR}/src/pugixml
+                        ${CURL_INCLUDE_DIRS})
+    set(DEPLIBS ${CURL_LIBRARIES})
   endif()
 
   set(XTC_SOURCES
