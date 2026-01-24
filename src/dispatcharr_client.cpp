@@ -345,16 +345,21 @@ bool Client::EnsureToken()
   ss << "{\"username\":\"" << JsonEscape(m_settings.username) 
      << "\",\"password\":\"" << JsonEscape(m_settings.password) << "\"}";
   
+  std::string jsonBody = ss.str();
   std::string url = GetBaseUrl() + "/api/accounts/token/";
   kodi::Log(ADDON_LOG_DEBUG, "pvr.dispatcharr: EnsureToken - URL: %s", url.c_str());
   kodi::Log(ADDON_LOG_DEBUG, "pvr.dispatcharr: EnsureToken - Username: %s", m_settings.username.c_str());
+  kodi::Log(ADDON_LOG_DEBUG, "pvr.dispatcharr: EnsureToken - POST body: %s", jsonBody.c_str());
   
   // Bypass Request() to avoid recursion and auth header
   HttpResponse resp;
   kodi::vfs::CFile file;
   file.CURLCreate(url);
   file.CURLAddOption(ADDON_CURL_OPTION_HEADER, "Content-Type", "application/json");
-  file.CURLAddOption(ADDON_CURL_OPTION_PROTOCOL, "postdata", ss.str());
+  file.CURLAddOption(ADDON_CURL_OPTION_HEADER, "Accept", "application/json");
+  file.CURLAddOption(ADDON_CURL_OPTION_PROTOCOL, "postdata", jsonBody);
+  // Allow reading error responses
+  file.CURLAddOption(ADDON_CURL_OPTION_PROTOCOL, "failonerror", "false");
   
   if (file.CURLOpen(0)) {
     char buf[4096];
