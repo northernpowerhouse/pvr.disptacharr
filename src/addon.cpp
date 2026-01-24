@@ -23,6 +23,16 @@
 #include "xtream_client.h"
 #include "dispatcharr_client.h"
 
+// Platform-specific time functions
+#ifdef _WIN32
+  // Windows doesn't have localtime_r, use localtime_s instead
+  static inline std::tm* localtime_r_compat(const time_t* timer, std::tm* buf)
+  {
+    return (localtime_s(buf, timer) == 0) ? buf : nullptr;
+  }
+  #define localtime_r localtime_r_compat
+#endif
+
 namespace
 {
 std::string Trim(std::string s)
