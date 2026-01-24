@@ -123,13 +123,17 @@ else()
     )
     # Exception handling and RTTI  
     target_compile_options(${ADDON_ID} PRIVATE /EHsc /GR)
-    # Linker options to handle weak/COMDAT symbols from multiple translation units
-    # The _Avx2WmemEnabledWeakValue symbol is emitted by MSVC for CPU feature detection
-    # These are "weak" symbols that should be allowed to have multiple definitions
+    # Linker options:
+    # /OPT:REF removes unreferenced code/data
+    # /OPT:ICF enables identical COMDAT folding
+    # /IGNORE:4006 suppresses warnings about duplicate weak symbols (_Avx2WmemEnabledWeakValue)
+    # /IGNORE:4088 suppresses the /FORCE warning (we don't actually use /FORCE anymore)
     target_link_options(${ADDON_ID} PRIVATE 
       /OPT:REF 
       /OPT:ICF
       /FORCE:MULTIPLE
+      "/IGNORE:4006"
+      "/IGNORE:4088"
     )
     # Define common Windows macros
     target_compile_definitions(${ADDON_ID} PRIVATE 
