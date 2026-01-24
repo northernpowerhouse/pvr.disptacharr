@@ -132,7 +132,7 @@ jobs:
             *) PLAT="$MATRIX_OS" ;;
           esac
           ZIP_NAME="pvr.dispatcharr-${VERSION}-${PLAT}.zip"
-          (cd dist && zip -qr "$ZIP_NAME" pvr.dispatcharr)
+          (cd dist/pvr.dispatcharr && zip -qr "../$ZIP_NAME" .)
           echo "Created release ZIP: $ZIP_NAME"
           ls -lah dist/*.zip
 
@@ -285,7 +285,7 @@ jobs:
         run: |
           set -e
           ZIP_NAME="pvr.dispatcharr-${VERSION}-android-${{ matrix.abi }}.zip"
-          (cd dist && zip -qr "$ZIP_NAME" pvr.dispatcharr)
+          (cd dist/pvr.dispatcharr && zip -qr "../$ZIP_NAME" .)
           echo "Created release ZIP: $ZIP_NAME"
           ls -lah dist/*.zip
 
