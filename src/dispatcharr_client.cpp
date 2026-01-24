@@ -484,10 +484,8 @@ bool Client::AddSeriesRule(const std::string& tvgId, const std::string& title, c
   ss << "}";
   
   auto resp = Request("POST", "/api/channels/series-rules/", ss.str());
-  // Django REST Framework returns 201 Created with the created object, not "success":true
-  // CURLOpen success means statusCode=200 in our implementation
-  // Check if response contains "id" field indicating successful creation
-  bool success = resp.statusCode == 200 && (resp.body.find("\"id\"") != std::string::npos || resp.body.find("\"tvg_id\"") != std::string::npos);
+  // Django REST Framework returns 201 Created with the created object
+  bool success = (resp.statusCode == 200 || resp.statusCode == 201) && (resp.body.find("\"id\"") != std::string::npos || resp.body.find("\"tvg_id\"") != std::string::npos);
   kodi::Log(success ? ADDON_LOG_DEBUG : ADDON_LOG_ERROR, 
             "pvr.dispatcharr: AddSeriesRule result - success=%d, body=%s", 
             success, resp.body.substr(0, 200).c_str());
@@ -499,7 +497,8 @@ bool Client::DeleteSeriesRule(const std::string& tvgId)
   if (!EnsureToken()) return false;
   // URL encode? Assuming tvgId is safe-ish or basic chars
   auto resp = Request("DELETE", "/api/channels/series-rules/" + tvgId + "/");
-  return resp.statusCode == 200;
+  // HTTP 204 No Content is the correct response for DELETE
+  return resp.statusCode == 200 || resp.statusCode == 204;
 }
 
 bool Client::FetchRecurringRules(std::vector<RecurringRule>& outRules)
@@ -573,7 +572,8 @@ bool Client::DeleteRecurringRule(int id)
 {
   if (!EnsureToken()) return false;
   auto resp = Request("DELETE", "/api/channels/recurring-rules/" + std::to_string(id) + "/");
-  return resp.statusCode == 200;
+  // HTTP 204 No Content is the correct response for DELETE
+  return resp.statusCode == 200 || resp.statusCode == 204;
 }
 
 bool Client::FetchChannels(std::vector<DispatchChannel>& outChannels)
@@ -672,7 +672,8 @@ bool Client::DeleteRecording(int id)
 {
   if (!EnsureToken()) return false;
   auto resp = Request("DELETE", "/api/channels/recordings/" + std::to_string(id) + "/");
-  return resp.statusCode == 200;
+  // HTTP 204 No Content is the correct response for DELETE
+  return resp.statusCode == 200 || resp.statusCode == 204;
 }
 
 bool Client::ScheduleRecording(int channelId, time_t startTime, time_t endTime, const std::string& title)

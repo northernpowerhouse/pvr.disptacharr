@@ -577,6 +577,8 @@ public:
           types.push_back(t);
       }
       // Type 2: Series Recording (EPG-based, repeating)
+      // NOTE: Series rules in Dispatcharr are EPG-based (tvg_id + title match)
+      // They do NOT use start/end times - the EPG determines when to record
       {
           PVRTimerType t;
           t.SetId(2);
@@ -585,8 +587,6 @@ public:
               PVR_TIMER_TYPE_IS_REPEATING |
               PVR_TIMER_TYPE_SUPPORTS_ENABLE_DISABLE |
               PVR_TIMER_TYPE_SUPPORTS_CHANNELS |
-              PVR_TIMER_TYPE_SUPPORTS_START_TIME |
-              PVR_TIMER_TYPE_SUPPORTS_END_TIME |
               PVR_TIMER_TYPE_SUPPORTS_TITLE_EPG_MATCH |
               PVR_TIMER_TYPE_SUPPORTS_ANY_CHANNEL
           );
@@ -709,8 +709,10 @@ public:
           }
           std::string title = timer.GetTitle(); 
           // If title is empty?
-          if (m_dispatcharrClient->AddSeriesRule(tvgId, title, "new"))
+          if (m_dispatcharrClient->AddSeriesRule(tvgId, title, "new")) {
+              TriggerTimerUpdate();
               return PVR_ERROR_NO_ERROR;
+          }
       }
       else if (typeId == 3) // Recurring
       {
@@ -747,8 +749,10 @@ public:
           r.startDate = "2026-01-01"; // Dummy defaults as we don't present UI for date ranges in Kodi easily
           r.endDate = "2030-01-01";
           
-          if (m_dispatcharrClient->AddRecurringRule(r))
+          if (m_dispatcharrClient->AddRecurringRule(r)) {
+              TriggerTimerUpdate();
               return PVR_ERROR_NO_ERROR;
+          }
       }
       else // One-shot (Type 1 or default)
       {
@@ -759,8 +763,10 @@ public:
               return PVR_ERROR_FAILED;
           }
           
-          if (m_dispatcharrClient->ScheduleRecording(dispatchChannelId, timer.GetStartTime(), timer.GetEndTime(), timer.GetTitle()))
+          if (m_dispatcharrClient->ScheduleRecording(dispatchChannelId, timer.GetStartTime(), timer.GetEndTime(), timer.GetTitle())) {
+              TriggerTimerUpdate();
               return PVR_ERROR_NO_ERROR;
+          }
       }
 
       return PVR_ERROR_FAILED;
@@ -780,13 +786,17 @@ public:
       if (clientIndex >= 30000) {
           // Scheduled recording - ID is clientIndex - 30000
           int recId = static_cast<int>(clientIndex - 30000);
-          if (m_dispatcharrClient->DeleteRecording(recId)) 
+          if (m_dispatcharrClient->DeleteRecording(recId)) {
+              TriggerTimerUpdate();
               return PVR_ERROR_NO_ERROR;
+          }
       } else if (clientIndex >= 20000) {
           // Recurring rule - ID is clientIndex - 20000
           int ruleId = static_cast<int>(clientIndex - 20000);
-          if (m_dispatcharrClient->DeleteRecurringRule(ruleId)) 
+          if (m_dispatcharrClient->DeleteRecurringRule(ruleId)) {
+              TriggerTimerUpdate();
               return PVR_ERROR_NO_ERROR;
+          }
       } else if (clientIndex >= 10000) {
           // Series rule - need to look up by index since we use a counter
           // This is tricky - we'd need to store a mapping. For now, fetch and match by position.
@@ -794,8 +804,10 @@ public:
           if (m_dispatcharrClient->FetchSeriesRules(series)) {
               size_t idx = clientIndex - 10000;
               if (idx < series.size()) {
-                  if (m_dispatcharrClient->DeleteSeriesRule(series[idx].tvgId))
+                  if (m_dispatcharrClient->DeleteSeriesRule(series[idx].tvgId)) {
+                      TriggerTimerUpdate();
                       return PVR_ERROR_NO_ERROR;
+                  }
               }
           }
       }
