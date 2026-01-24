@@ -73,6 +73,7 @@ public:
   // Channels (for ID mapping)
   bool FetchChannels(std::vector<DispatchChannel>& outChannels);
   int GetDispatchChannelId(int kodiChannelUid);  // Maps Kodi UID to Dispatcharr ID
+  int GetKodiChannelUid(int dispatchChannelId);  // Maps Dispatcharr ID to Kodi UID
   
   // Series Rules (Season Pass)
   bool FetchSeriesRules(std::vector<SeriesRule>& outRules);
@@ -93,6 +94,7 @@ private:
   DvrSettings m_settings;
   std::string m_accessToken;
   std::map<int, int> m_channelNumberToDispatchId;  // Maps channel number to Dispatcharr ID
+  std::map<int, int> m_dispatchIdToChannelNumber;  // Maps Dispatcharr ID to channel number (Kodi UID)
   
   // Helper for HTTP requests
   struct HttpResponse {

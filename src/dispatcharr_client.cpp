@@ -608,6 +608,7 @@ bool Client::EnsureChannelMapping()
   
   for (const auto& ch : channels) {
     m_channelNumberToDispatchId[ch.channelNumber] = ch.id;
+    m_dispatchIdToChannelNumber[ch.id] = ch.channelNumber;
     kodi::Log(ADDON_LOG_DEBUG, "pvr.dispatcharr: Channel mapping: number %d -> Dispatcharr ID %d", 
               ch.channelNumber, ch.id);
   }
@@ -630,6 +631,19 @@ int Client::GetDispatchChannelId(int kodiChannelUid)
   }
   
   kodi::Log(ADDON_LOG_WARNING, "pvr.dispatcharr: No Dispatcharr channel found for Kodi UID %d", kodiChannelUid);
+  return -1;
+}
+
+int Client::GetKodiChannelUid(int dispatchChannelId)
+{
+  if (!EnsureChannelMapping()) return -1;
+  
+  auto it = m_dispatchIdToChannelNumber.find(dispatchChannelId);
+  if (it != m_dispatchIdToChannelNumber.end()) {
+    return it->second;
+  }
+  
+  kodi::Log(ADDON_LOG_WARNING, "pvr.dispatcharr: No Kodi channel found for Dispatcharr ID %d", dispatchChannelId);
   return -1;
 }
 

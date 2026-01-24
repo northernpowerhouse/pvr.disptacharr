@@ -616,9 +616,12 @@ public:
   {
       if (!m_dispatcharrClient) return PVR_ERROR_SERVER_ERROR;
 
+      kodi::Log(ADDON_LOG_DEBUG, "pvr.dispatcharr: GetTimers called");
+
       // 1. Series Rules (Type 2)
       std::vector<dispatcharr::SeriesRule> series;
       if (m_dispatcharrClient->FetchSeriesRules(series)) {
+          kodi::Log(ADDON_LOG_DEBUG, "pvr.dispatcharr: GetTimers - fetched %zu series rules", series.size());
           unsigned int seriesIdx = 0;
           for (const auto& s : series) {
               kodi::addon::PVRTimer t;
@@ -636,13 +639,18 @@ public:
       // 2. Recurring Rules (Type 3)
       std::vector<dispatcharr::RecurringRule> recurring;
       if (m_dispatcharrClient->FetchRecurringRules(recurring)) {
+          kodi::Log(ADDON_LOG_DEBUG, "pvr.dispatcharr: GetTimers - fetched %zu recurring rules", recurring.size());
           for (const auto& r : recurring) {
               kodi::addon::PVRTimer t;
               // Use the rule ID offset by 20000 to avoid collision with series IDs
               t.SetClientIndex(static_cast<unsigned int>(20000 + r.id));
               t.SetTitle(r.name.empty() ? "Recurring" : r.name);
               t.SetTimerType(3);
-              t.SetClientChannelUid(r.channelId);
+              // Map Dispatcharr channel ID back to Kodi channel UID
+              int kodiUid = m_dispatcharrClient->GetKodiChannelUid(r.channelId);
+              if (kodiUid > 0) {
+                  t.SetClientChannelUid(kodiUid);
+              }
               t.SetState(r.enabled ? PVR_TIMER_STATE_SCHEDULED : PVR_TIMER_STATE_DISABLED);
               // Approximate next occurrence logic omitted for brevity, 
               // just showing it exists.
@@ -655,22 +663,30 @@ public:
       std::vector<dispatcharr::Recording> recs;
       if (m_dispatcharrClient->FetchRecordings(recs)) {
           time_t now = time(nullptr);
+          int futureCount = 0;
           for (const auto& r : recs) {
               if (r.startTime <= now) continue; 
+              futureCount++;
               
               kodi::addon::PVRTimer t;
               // Use the recording ID offset by 30000 to avoid collision
               t.SetClientIndex(static_cast<unsigned int>(30000 + r.id));
               t.SetTitle(r.title);
               t.SetTimerType(1);
-              t.SetClientChannelUid(r.channelId);
+              // Map Dispatcharr channel ID back to Kodi channel UID
+              int kodiUid = m_dispatcharrClient->GetKodiChannelUid(r.channelId);
+              if (kodiUid > 0) {
+                  t.SetClientChannelUid(kodiUid);
+              }
               t.SetStartTime(r.startTime);
               t.SetEndTime(r.endTime);
               t.SetState(PVR_TIMER_STATE_SCHEDULED);
               results.Add(t);
           }
+          kodi::Log(ADDON_LOG_DEBUG, "pvr.dispatcharr: GetTimers - fetched %zu recordings, %d future", recs.size(), futureCount);
       }
       
+      kodi::Log(ADDON_LOG_DEBUG, "pvr.dispatcharr: GetTimers complete");
       return PVR_ERROR_NO_ERROR;
   }
 
@@ -764,6 +780,7 @@ public:
           }
           
           if (m_dispatcharrClient->ScheduleRecording(dispatchChannelId, timer.GetStartTime(), timer.GetEndTime(), timer.GetTitle())) {
+              kodi::Log(ADDON_LOG_DEBUG, "pvr.dispatcharr: Timer created successfully, calling TriggerTimerUpdate");
               TriggerTimerUpdate();
               return PVR_ERROR_NO_ERROR;
           }
