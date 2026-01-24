@@ -714,8 +714,15 @@ public:
       }
       else if (typeId == 3) // Recurring
       {
+          // Map Kodi channel UID to Dispatcharr channel ID
+          int dispatchChannelId = m_dispatcharrClient->GetDispatchChannelId(static_cast<int>(chanUid));
+          if (dispatchChannelId < 0) {
+              kodi::Log(ADDON_LOG_ERROR, "pvr.dispatcharr: Cannot add recurring rule, no Dispatcharr channel found for Kodi UID %u", chanUid);
+              return PVR_ERROR_FAILED;
+          }
+          
           dispatcharr::RecurringRule r;
-          r.channelId = chanUid;
+          r.channelId = dispatchChannelId;
           r.name = timer.GetTitle();
           
           // Map timer.GetStartTime() (time_t) to HH:MM:SS
@@ -745,7 +752,14 @@ public:
       }
       else // One-shot (Type 1 or default)
       {
-          if (m_dispatcharrClient->ScheduleRecording(chanUid, timer.GetStartTime(), timer.GetEndTime(), timer.GetTitle()))
+          // Map Kodi channel UID to Dispatcharr channel ID
+          int dispatchChannelId = m_dispatcharrClient->GetDispatchChannelId(static_cast<int>(chanUid));
+          if (dispatchChannelId < 0) {
+              kodi::Log(ADDON_LOG_ERROR, "pvr.dispatcharr: Cannot schedule recording, no Dispatcharr channel found for Kodi UID %u", chanUid);
+              return PVR_ERROR_FAILED;
+          }
+          
+          if (m_dispatcharrClient->ScheduleRecording(dispatchChannelId, timer.GetStartTime(), timer.GetEndTime(), timer.GetTitle()))
               return PVR_ERROR_NO_ERROR;
       }
 

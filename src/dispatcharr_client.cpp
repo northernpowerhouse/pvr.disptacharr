@@ -575,6 +575,63 @@ bool Client::DeleteRecurringRule(int id)
   return resp.statusCode == 200;
 }
 
+bool Client::FetchChannels(std::vector<DispatchChannel>& outChannels)
+{
+  if (!EnsureToken()) return false;
+  auto resp = Request("GET", "/api/channels/channels/");
+  if (resp.statusCode != 200) return false;
+  
+  outChannels.clear();
+  ForEachObjectInArray(resp.body, [&](std::string_view obj){
+    DispatchChannel ch;
+    if (ExtractIntField(obj, "id", ch.id)) {
+      // channel_number is a float in the API, but we'll read as int
+      ExtractIntField(obj, "channel_number", ch.channelNumber);
+      ExtractStringField(obj, "name", ch.name);
+      ExtractStringField(obj, "uuid", ch.uuid);
+      outChannels.push_back(ch);
+    }
+  });
+  return true;
+}
+
+bool Client::EnsureChannelMapping()
+{
+  if (!m_channelNumberToDispatchId.empty()) return true;
+  
+  std::vector<DispatchChannel> channels;
+  if (!FetchChannels(channels)) {
+    kodi::Log(ADDON_LOG_ERROR, "pvr.dispatcharr: Failed to fetch channels for mapping");
+    return false;
+  }
+  
+  for (const auto& ch : channels) {
+    m_channelNumberToDispatchId[ch.channelNumber] = ch.id;
+    kodi::Log(ADDON_LOG_DEBUG, "pvr.dispatcharr: Channel mapping: number %d -> Dispatcharr ID %d", 
+              ch.channelNumber, ch.id);
+  }
+  
+  kodi::Log(ADDON_LOG_INFO, "pvr.dispatcharr: Built channel mapping with %zu channels", 
+            m_channelNumberToDispatchId.size());
+  return true;
+}
+
+int Client::GetDispatchChannelId(int kodiChannelUid)
+{
+  if (!EnsureChannelMapping()) return -1;
+  
+  // The Kodi channel UID is the Xtream stream ID.
+  // Dispatcharr channels may have channel_number set to match.
+  // We'll try to find by channel number first.
+  auto it = m_channelNumberToDispatchId.find(kodiChannelUid);
+  if (it != m_channelNumberToDispatchId.end()) {
+    return it->second;
+  }
+  
+  kodi::Log(ADDON_LOG_WARNING, "pvr.dispatcharr: No Dispatcharr channel found for Kodi UID %d", kodiChannelUid);
+  return -1;
+}
+
 bool Client::FetchRecordings(std::vector<Recording>& outRecordings)
 {
   if (!EnsureToken()) return false;

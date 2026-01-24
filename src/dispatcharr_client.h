@@ -54,6 +54,14 @@ struct TokenResponse
   std::string refreshToken;
 };
 
+struct DispatchChannel
+{
+  int id = 0;           // Dispatcharr's internal ID
+  int channelNumber = 0; // The channel number (matches Kodi's)
+  std::string name;
+  std::string uuid;
+};
+
 class Client
 {
 public:
@@ -61,6 +69,10 @@ public:
 
   // Auth
   bool EnsureToken();
+  
+  // Channels (for ID mapping)
+  bool FetchChannels(std::vector<DispatchChannel>& outChannels);
+  int GetDispatchChannelId(int kodiChannelUid);  // Maps Kodi UID to Dispatcharr ID
   
   // Series Rules (Season Pass)
   bool FetchSeriesRules(std::vector<SeriesRule>& outRules);
@@ -80,6 +92,7 @@ public:
 private:
   DvrSettings m_settings;
   std::string m_accessToken;
+  std::map<int, int> m_channelNumberToDispatchId;  // Maps channel number to Dispatcharr ID
   
   // Helper for HTTP requests
   struct HttpResponse {
@@ -89,6 +102,7 @@ private:
   
   HttpResponse Request(const std::string& method, const std::string& endpoint, const std::string& jsonBody = "");
   std::string GetBaseUrl() const;
+  bool EnsureChannelMapping();
 };
 
 } // namespace dispatcharr
