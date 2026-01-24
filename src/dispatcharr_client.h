@@ -45,6 +45,7 @@ struct Recording
   std::string plot;
   std::string streamUrl;
   std::string status;  // "scheduled", "recording", "completed", "interrupted"
+  std::string iconPath; // poster_url from custom_properties
   time_t startTime = 0;
   time_t endTime = 0;
 };

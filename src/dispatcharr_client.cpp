@@ -672,6 +672,8 @@ bool Client::FetchRecordings(std::vector<Recording>& outRecordings)
           }
           // Extract status: "scheduled", "recording", "completed", "interrupted"
           ExtractStringField(customProps, "status", r.status);
+          // Extract poster_url for cover art
+          ExtractStringField(customProps, "poster_url", r.iconPath);
       }
       
       // Stream URL

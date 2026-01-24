@@ -507,7 +507,13 @@ public:
        int duration = static_cast<int>(r.endTime - r.startTime);
        rec.SetDuration(duration > 0 ? duration : 0);
        // Stream URL is provided via GetRecordingStreamProperties
-       rec.SetChannelUid(static_cast<int>(r.channelId)); 
+       rec.SetChannelUid(static_cast<int>(r.channelId));
+       // Set poster image if available
+       if (!r.iconPath.empty()) {
+           rec.SetIconPath(r.iconPath);
+           rec.SetThumbnailPath(r.iconPath);
+           rec.SetFanartPath(r.iconPath);
+       } 
        
        results.Add(rec);
     }
