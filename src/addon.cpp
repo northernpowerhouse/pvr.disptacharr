@@ -748,13 +748,16 @@ public:
           // Kodi passes absolute time for the FIRST occurrence.
           time_t start = timer.GetStartTime();
           time_t end = timer.GetEndTime();
-          struct tm* tmStart = localtime(&start); 
-          struct tm* tmEnd = localtime(&end);
+          
+          // Use localtime_r or copy the struct, as localtime uses a static buffer
+          struct tm tmStart, tmEnd;
+          localtime_r(&start, &tmStart);
+          localtime_r(&end, &tmEnd);
           
           char buf[10];
-          strftime(buf, sizeof(buf), "%H:%M:%S", tmStart);
+          strftime(buf, sizeof(buf), "%H:%M:%S", &tmStart);
           r.startTime = buf;
-          strftime(buf, sizeof(buf), "%H:%M:%S", tmEnd);
+          strftime(buf, sizeof(buf), "%H:%M:%S", &tmEnd);
           r.endTime = buf;
           
           r.daysOfWeek = {0,1,2,3,4,5,6}; // Default to daily if not specified? 
