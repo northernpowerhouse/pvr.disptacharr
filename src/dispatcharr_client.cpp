@@ -14,38 +14,26 @@
 #include <string_view>
 #include <vector>
 
-// Base64 encoding for CURL postdata (Kodi requires Base64-encoded POST body)
+// URL encoding (percent encoding) for CURL postdata
+// Kodi's VFS parses | and & as delimiters, so JSON characters must be escaped
 namespace {
-static const char b64_table[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
 
-std::string Base64Encode(const std::string& input) {
-  std::string encoded;
-  encoded.reserve(((input.size() + 2) / 3) * 4);
+std::string UrlEncode(const std::string& input) {
+  std::ostringstream encoded;
+  encoded.fill('0');
+  encoded << std::hex << std::uppercase;
   
-  size_t i = 0;
-  while (i < input.size()) {
-    uint32_t octet_a = i < input.size() ? static_cast<unsigned char>(input[i++]) : 0;
-    uint32_t octet_b = i < input.size() ? static_cast<unsigned char>(input[i++]) : 0;
-    uint32_t octet_c = i < input.size() ? static_cast<unsigned char>(input[i++]) : 0;
-    
-    uint32_t triple = (octet_a << 16) | (octet_b << 8) | octet_c;
-    
-    encoded.push_back(b64_table[(triple >> 18) & 0x3F]);
-    encoded.push_back(b64_table[(triple >> 12) & 0x3F]);
-    encoded.push_back(b64_table[(triple >> 6) & 0x3F]);
-    encoded.push_back(b64_table[triple & 0x3F]);
+  for (unsigned char c : input) {
+    // Unreserved characters (RFC 3986): ALPHA, DIGIT, -, ., _, ~
+    if (std::isalnum(c) || c == '-' || c == '.' || c == '_' || c == '~') {
+      encoded << c;
+    } else {
+      // Percent-encode everything else
+      encoded << '%' << std::setw(2) << static_cast<int>(c);
+    }
   }
   
-  // Handle padding
-  size_t mod = input.size() % 3;
-  if (mod == 1) {
-    encoded[encoded.size() - 2] = '=';
-    encoded[encoded.size() - 1] = '=';
-  } else if (mod == 2) {
-    encoded[encoded.size() - 1] = '=';
-  }
-  
-  return encoded;
+  return encoded.str();
 }
 } // anonymous namespace
 
@@ -344,9 +332,9 @@ Client::HttpResponse Client::Request(const std::string& method, const std::strin
     file.CURLAddOption(ADDON_CURL_OPTION_HEADER, "Authorization", "Bearer " + m_accessToken);
   }
 
-  // Method - use postdata for POST body (Kodi requires Base64 encoding)
+  // Method - use postdata for POST body (Kodi requires URL/percent encoding)
   if (method == "POST") {
-    std::string encodedBody = Base64Encode(jsonBody);
+    std::string encodedBody = UrlEncode(jsonBody);
     file.CURLAddOption(ADDON_CURL_OPTION_PROTOCOL, "postdata", encodedBody);
   } else if (method == "DELETE") {
     // For DELETE, we need to set custom request via URL or use a different approach
@@ -404,8 +392,8 @@ bool Client::EnsureToken()
   file.CURLCreate(url);
   file.CURLAddOption(ADDON_CURL_OPTION_HEADER, "Content-Type", "application/json");
   file.CURLAddOption(ADDON_CURL_OPTION_HEADER, "Accept", "application/json");
-  // Kodi requires postdata to be Base64 encoded
-  std::string encodedBody = Base64Encode(jsonBody);
+  // Kodi requires postdata to be URL/percent encoded
+  std::string encodedBody = UrlEncode(jsonBody);
   file.CURLAddOption(ADDON_CURL_OPTION_PROTOCOL, "postdata", encodedBody);
   // Allow reading error responses
   file.CURLAddOption(ADDON_CURL_OPTION_PROTOCOL, "failonerror", "false");
