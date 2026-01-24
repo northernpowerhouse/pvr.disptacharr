@@ -126,12 +126,6 @@ else()
     )
     # Add verbose linker output to diagnose link issues
     target_link_options(${ADDON_ID} PRIVATE /VERBOSE:LIB)
-
-    # Link C++ standard library explicitly to ensure locale facets resolve
-    if(MSVC)
-      # msvcprt is the import library for the C++ STL runtime
-      target_link_libraries(${ADDON_ID} PRIVATE msvcprt)
-    endif()
   endif()
 
   # CMAKE_MSVC_RUNTIME_LIBRARY property automatically handles CRT linkage
