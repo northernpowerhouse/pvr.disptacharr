@@ -40,16 +40,22 @@ jobs:
         timeout-minutes: 15
         run: |
           sudo apt-get update -y
-          sudo apt-get install -y cmake build-essential zip g++ libpugixml-dev 2>&1 | tail -20
+          sudo apt-get install -y cmake build-essential zip g++ libpugixml-dev libcurl4-openssl-dev 2>&1 | tail -20
           echo "Build dependencies installed successfully"
 
       - name: Install build deps (Windows)
         if: startsWith(matrix.os, 'windows')
         timeout-minutes: 15
-        shell: bash
+        shell: pwsh
         run: |
           choco install cmake --installargs 'ADD_CMAKE_TO_PATH=System' -y
           choco install zip -y
+          # Install vcpkg and curl
+          git clone https://github.com/Microsoft/vcpkg.git C:\vcpkg
+          C:\vcpkg\bootstrap-vcpkg.bat
+          C:\vcpkg\vcpkg install curl:x64-windows
+          echo "VCPKG_ROOT=C:\vcpkg" >> $env:GITHUB_ENV
+          echo "CMAKE_TOOLCHAIN_FILE=C:\vcpkg\scripts\buildsystems\vcpkg.cmake" >> $env:GITHUB_ENV
           echo "Build dependencies installed successfully"
 
       - name: Build and stage addon
@@ -178,6 +184,65 @@ jobs:
           sudo apt-get install -y libpugixml-dev 2>&1 | tail -20
           echo "Android build dependencies installed"
 
+      - name: Build curl for Android
+        env:
+          ANDROID_ABI: ${{ matrix.abi }}
+        run: |
+          NDK_PATH="${ANDROID_NDK_ROOT:-${ANDROID_NDK_HOME}}"
+          
+          # Download curl source
+          curl -L https://curl.se/download/curl-8.5.0.tar.gz -o curl.tar.gz
+          tar xzf curl.tar.gz
+          cd curl-8.5.0
+          
+          # Set up Android toolchain
+          if [ "$ANDROID_ABI" = "armeabi-v7a" ]; then
+            TARGET_HOST=armv7a-linux-androideabi
+            TOOLCHAIN_PREFIX=armv7a-linux-androideabi
+          elif [ "$ANDROID_ABI" = "arm64-v8a" ]; then
+            TARGET_HOST=aarch64-linux-android
+            TOOLCHAIN_PREFIX=aarch64-linux-android
+          elif [ "$ANDROID_ABI" = "x86" ]; then
+            TARGET_HOST=i686-linux-android
+            TOOLCHAIN_PREFIX=i686-linux-android
+          elif [ "$ANDROID_ABI" = "x86_64" ]; then
+            TARGET_HOST=x86_64-linux-android
+            TOOLCHAIN_PREFIX=x86_64-linux-android
+          fi
+          
+          export ANDROID_NDK=$NDK_PATH
+          export TOOLCHAIN=$NDK_PATH/toolchains/llvm/prebuilt/linux-x86_64
+          export API=21
+          export AR=$TOOLCHAIN/bin/llvm-ar
+          export CC=$TOOLCHAIN/bin/${TOOLCHAIN_PREFIX}${API}-clang
+          export CXX=$TOOLCHAIN/bin/${TOOLCHAIN_PREFIX}${API}-clang++
+          export LD=$TOOLCHAIN/bin/ld
+          export RANLIB=$TOOLCHAIN/bin/llvm-ranlib
+          export STRIP=$TOOLCHAIN/bin/llvm-strip
+          
+          ./configure --host=$TARGET_HOST \
+            --prefix=$PWD/../curl-android \
+            --disable-shared \
+            --enable-static \
+            --without-ssl \
+            --without-zlib \
+            --disable-dict \
+            --disable-ftp \
+            --disable-imap \
+            --disable-ldap \
+            --disable-ldaps \
+            --disable-pop3 \
+            --disable-rtsp \
+            --disable-smtp \
+            --disable-telnet \
+            --disable-tftp
+          
+          make -j$(nproc)
+          make install
+          
+          echo "CURL_ROOT=$PWD/../curl-android" >> $GITHUB_ENV
+          echo "Curl built for Android $ANDROID_ABI"
+
       - name: Build addon (Android)
         timeout-minutes: 45
         env:
@@ -192,7 +257,7 @@ jobs:
             echo "ERROR: NDK not found"
             exit 1
           fi
-          export CMAKE_EXTRA_ARGS="-DCMAKE_TOOLCHAIN_FILE=$NDK_PATH/build/cmake/android.toolchain.cmake -DANDROID_ABI=${{ matrix.abi }} -DANDROID_PLATFORM=android-21"
+          export CMAKE_EXTRA_ARGS="-DCMAKE_TOOLCHAIN_FILE=$NDK_PATH/build/cmake/android.toolchain.cmake -DANDROID_ABI=${{ matrix.abi }} -DANDROID_PLATFORM=android-21 -DCURL_ROOT=$CURL_ROOT -DCURL_INCLUDE_DIR=$CURL_ROOT/include -DCURL_LIBRARY=$CURL_ROOT/lib/libcurl.a"
           if [[ -n "$VERSION" ]]; then
             VERSION="${VERSION#v}"  # Strip 'v' prefix
             ./build.sh --skip-zip --version "$VERSION"

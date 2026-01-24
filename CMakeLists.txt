@@ -68,6 +68,11 @@ else()
   set(CMAKE_CXX_STANDARD 17)
   set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+  # Find libcurl
+  find_package(CURL REQUIRED)
+  message(STATUS "Found CURL: ${CURL_LIBRARIES}")
+  message(STATUS "CURL include dirs: ${CURL_INCLUDE_DIRS}")
+
   # Add std::locale test executable on Windows to diagnose linking issues
   # This can run without KODI_ADDON_SDK to isolate the linking problem
   if(WIN32)
@@ -116,7 +121,11 @@ else()
   target_include_directories(${ADDON_ID} PRIVATE
     "${KODI_ADDON_SDK}/include"
     "${CMAKE_SOURCE_DIR}/src/pugixml"
+    ${CURL_INCLUDE_DIRS}
   )
+
+  # Link libcurl
+  target_link_libraries(${ADDON_ID} PRIVATE ${CURL_LIBRARIES})
 
   set_target_properties(${ADDON_ID} PROPERTIES PREFIX "")
 
