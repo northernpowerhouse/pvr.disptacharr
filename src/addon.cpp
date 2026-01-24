@@ -665,7 +665,8 @@ public:
           time_t now = time(nullptr);
           int futureCount = 0;
           for (const auto& r : recs) {
-              if (r.startTime <= now) continue; 
+              // Skip recordings that have already ended
+              if (r.endTime <= now) continue; 
               futureCount++;
               
               kodi::addon::PVRTimer t;
