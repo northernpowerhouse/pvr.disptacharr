@@ -258,10 +258,34 @@ Client::Client(const DvrSettings& settings) : m_settings(settings)
 
 std::string Client::GetBaseUrl() const
 {
+  std::string server = m_settings.server;
+  
+  // Strip trailing slashes
+  while (!server.empty() && server.back() == '/')
+    server.pop_back();
+  
+  // Check if server already has a protocol prefix
+  bool hasProtocol = (server.find("http://") == 0 || server.find("https://") == 0);
+  
   std::stringstream ss;
-  ss << "http://" << m_settings.server;
-  if (m_settings.port != 80 && m_settings.port > 0)
+  if (!hasProtocol) {
+    ss << "http://";
+  }
+  ss << server;
+  
+  // Check if port is already in the server string (after protocol)
+  bool hasPort = false;
+  size_t hostStart = hasProtocol ? server.find("://") + 3 : 0;
+  std::string hostPart = server.substr(hostStart);
+  if (hostPart.find(':') != std::string::npos) {
+    hasPort = true;
+  }
+  
+  // Add port if needed
+  if (!hasPort && m_settings.port > 0 && m_settings.port != 80) {
     ss << ":" << m_settings.port;
+  }
+  
   return ss.str();
 }
 
@@ -272,6 +296,7 @@ Client::HttpResponse Client::Request(const std::string& method, const std::strin
   std::string url = GetBaseUrl() + endpoint;
   
   file.CURLCreate(url);
+
   
   // Headers - use ADDON_CURL_OPTION_HEADER with name/value pairs
   file.CURLAddOption(ADDON_CURL_OPTION_HEADER, "Content-Type", "application/json");
@@ -320,10 +345,14 @@ bool Client::EnsureToken()
   ss << "{\"username\":\"" << JsonEscape(m_settings.username) 
      << "\",\"password\":\"" << JsonEscape(m_settings.password) << "\"}";
   
+  std::string url = GetBaseUrl() + "/api/accounts/token/";
+  kodi::Log(ADDON_LOG_DEBUG, "pvr.dispatcharr: EnsureToken - URL: %s", url.c_str());
+  kodi::Log(ADDON_LOG_DEBUG, "pvr.dispatcharr: EnsureToken - Username: %s", m_settings.username.c_str());
+  
   // Bypass Request() to avoid recursion and auth header
   HttpResponse resp;
   kodi::vfs::CFile file;
-  file.CURLCreate(GetBaseUrl() + "/api/accounts/token/");
+  file.CURLCreate(url);
   file.CURLAddOption(ADDON_CURL_OPTION_HEADER, "Content-Type", "application/json");
   file.CURLAddOption(ADDON_CURL_OPTION_PROTOCOL, "postdata", ss.str());
   
@@ -336,12 +365,19 @@ bool Client::EnsureToken()
     }
     file.Close();
     
+    kodi::Log(ADDON_LOG_DEBUG, "pvr.dispatcharr: EnsureToken - Response body length: %zu", resp.body.size());
+    kodi::Log(ADDON_LOG_DEBUG, "pvr.dispatcharr: EnsureToken - Response body (first 500 chars): %s", resp.body.substr(0, 500).c_str());
+    
     // Parse
     std::string token;
     if (ExtractStringField(resp.body, "access", token) && !token.empty()) {
       m_accessToken = token;
+      kodi::Log(ADDON_LOG_DEBUG, "pvr.dispatcharr: EnsureToken - Successfully extracted access token (length: %zu)", token.size());
       return true;
     }
+    kodi::Log(ADDON_LOG_ERROR, "pvr.dispatcharr: EnsureToken - Failed to extract access token from response");
+  } else {
+    kodi::Log(ADDON_LOG_ERROR, "pvr.dispatcharr: EnsureToken - CURLOpen failed");
   }
   kodi::Log(ADDON_LOG_ERROR, "pvr.dispatcharr: Failed to authenticate user %s", m_settings.username.c_str());
   return false;
