@@ -562,25 +562,51 @@ public:
   PVR_ERROR GetTimerTypes(std::vector<kodi::addon::PVRTimerType>& types) override
   {
       using namespace kodi::addon;
+      // Type 1: One-Time Recording (manual, time-based)
       {
           PVRTimerType t;
           t.SetId(1);
           t.SetDescription("One-Time Recording");
-          t.SetAttributes(PVR_TIMER_TYPE_IS_MANUAL); 
+          t.SetAttributes(
+              PVR_TIMER_TYPE_IS_MANUAL |
+              PVR_TIMER_TYPE_SUPPORTS_ENABLE_DISABLE |
+              PVR_TIMER_TYPE_SUPPORTS_CHANNELS |
+              PVR_TIMER_TYPE_SUPPORTS_START_TIME |
+              PVR_TIMER_TYPE_SUPPORTS_END_TIME
+          );
           types.push_back(t);
       }
+      // Type 2: Series Recording (EPG-based, repeating)
       {
           PVRTimerType t;
           t.SetId(2);
           t.SetDescription("Series Recording");
-          t.SetAttributes(PVR_TIMER_TYPE_IS_MANUAL | PVR_TIMER_TYPE_IS_REPEATING); 
+          t.SetAttributes(
+              PVR_TIMER_TYPE_IS_REPEATING |
+              PVR_TIMER_TYPE_SUPPORTS_ENABLE_DISABLE |
+              PVR_TIMER_TYPE_SUPPORTS_CHANNELS |
+              PVR_TIMER_TYPE_SUPPORTS_START_TIME |
+              PVR_TIMER_TYPE_SUPPORTS_END_TIME |
+              PVR_TIMER_TYPE_SUPPORTS_TITLE_EPG_MATCH |
+              PVR_TIMER_TYPE_SUPPORTS_ANY_CHANNEL
+          );
           types.push_back(t);
       }
+      // Type 3: Recurring Manual (manual, repeating, weekday-based)
       {
           PVRTimerType t;
           t.SetId(3);
           t.SetDescription("Recurring Manual");
-          t.SetAttributes(PVR_TIMER_TYPE_IS_MANUAL | PVR_TIMER_TYPE_IS_REPEATING); 
+          t.SetAttributes(
+              PVR_TIMER_TYPE_IS_MANUAL |
+              PVR_TIMER_TYPE_IS_REPEATING |
+              PVR_TIMER_TYPE_SUPPORTS_ENABLE_DISABLE |
+              PVR_TIMER_TYPE_SUPPORTS_CHANNELS |
+              PVR_TIMER_TYPE_SUPPORTS_START_TIME |
+              PVR_TIMER_TYPE_SUPPORTS_END_TIME |
+              PVR_TIMER_TYPE_SUPPORTS_FIRST_DAY |
+              PVR_TIMER_TYPE_SUPPORTS_WEEKDAYS
+          );
           types.push_back(t);
       }
       return PVR_ERROR_NO_ERROR;
@@ -653,9 +679,14 @@ public:
       if (!m_dispatcharrClient) return PVR_ERROR_SERVER_ERROR;
 
       unsigned int typeId = timer.GetTimerType();
+      int chanUid = timer.GetClientChannelUid();
+      
+      kodi::Log(ADDON_LOG_DEBUG, "pvr.dispatcharr: AddTimer called - type=%u, channel=%d, title='%s'",
+                typeId, chanUid, timer.GetTitle().c_str());
+      kodi::Log(ADDON_LOG_DEBUG, "pvr.dispatcharr: AddTimer - start=%ld, end=%ld",
+                (long)timer.GetStartTime(), (long)timer.GetEndTime());
       
       // Look up TVG ID for the channel
-      int chanUid = timer.GetClientChannelUid();
       std::string tvgId;
       
       {
