@@ -15,6 +15,19 @@
 #include <unordered_map>
 #include <vector>
 
+// Platform-specific time functions
+#ifdef _WIN32
+  // Windows doesn't have gmtime_r, use gmtime_s instead
+  static inline std::tm* gmtime_r_compat(const time_t* timer, std::tm* buf)
+  {
+    return (gmtime_s(buf, timer) == 0) ? buf : nullptr;
+  }
+  #define gmtime_r gmtime_r_compat
+  
+  // Windows doesn't have timegm, use _mkgmtime instead
+  #define timegm _mkgmtime
+#endif
+
 namespace
 {
 constexpr const char* kDefaultAddonUserAgent = "DispatcharrKodiAddon";
