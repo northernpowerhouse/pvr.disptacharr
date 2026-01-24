@@ -330,6 +330,11 @@ Client::HttpResponse Client::Request(const std::string& method, const std::strin
   kodi::vfs::CFile file;
   std::string url = GetBaseUrl() + endpoint;
   
+  kodi::Log(ADDON_LOG_DEBUG, "pvr.dispatcharr: Request %s %s", method.c_str(), url.c_str());
+  if (!jsonBody.empty()) {
+    kodi::Log(ADDON_LOG_DEBUG, "pvr.dispatcharr: Request body: %s", jsonBody.c_str());
+  }
+  
   file.CURLCreate(url);
 
   
@@ -353,6 +358,9 @@ Client::HttpResponse Client::Request(const std::string& method, const std::strin
       file.CURLAddOption(ADDON_CURL_OPTION_HEADER, "Authorization", "Bearer " + m_accessToken);
     }
   }
+  
+  // Allow reading error responses
+  file.CURLAddOption(ADDON_CURL_OPTION_PROTOCOL, "failonerror", "false");
 
   // Timeout
   // file.CURLAddOption(KODI_VFS_CURLOPT_TIMEOUT, m_settings.timeoutSeconds);
@@ -365,9 +373,12 @@ Client::HttpResponse Client::Request(const std::string& method, const std::strin
       resp.body.append(buf, read);
     }
     file.Close();
+    // CURLOpen success - assume 200 for now (Kodi VFS doesn't expose actual status code easily)
     resp.statusCode = 200; 
+    kodi::Log(ADDON_LOG_DEBUG, "pvr.dispatcharr: Response: %s", resp.body.substr(0, 500).c_str());
   } else {
     resp.statusCode = 0;
+    kodi::Log(ADDON_LOG_ERROR, "pvr.dispatcharr: Request failed - CURLOpen returned false");
   }
   
   return resp;
@@ -464,7 +475,14 @@ bool Client::AddSeriesRule(const std::string& tvgId, const std::string& title, c
   ss << "}";
   
   auto resp = Request("POST", "/api/channels/series-rules/", ss.str());
-  return resp.statusCode == 200 && resp.body.find("\"success\":true") != std::string::npos;
+  // Django REST Framework returns 201 Created with the created object, not "success":true
+  // CURLOpen success means statusCode=200 in our implementation
+  // Check if response contains "id" field indicating successful creation
+  bool success = resp.statusCode == 200 && (resp.body.find("\"id\"") != std::string::npos || resp.body.find("\"tvg_id\"") != std::string::npos);
+  kodi::Log(success ? ADDON_LOG_DEBUG : ADDON_LOG_ERROR, 
+            "pvr.dispatcharr: AddSeriesRule result - success=%d, body=%s", 
+            success, resp.body.substr(0, 200).c_str());
+  return success;
 }
 
 bool Client::DeleteSeriesRule(const std::string& tvgId)
@@ -534,7 +552,11 @@ bool Client::AddRecurringRule(const RecurringRule& rule)
   ss << "]}";
   
   auto resp = Request("POST", "/api/channels/recurring-rules/", ss.str());
-  return resp.statusCode == 200; // 201 actually, but Open returns true
+  bool success = resp.statusCode == 200 && resp.body.find("\"id\"") != std::string::npos;
+  kodi::Log(success ? ADDON_LOG_DEBUG : ADDON_LOG_ERROR, 
+            "pvr.dispatcharr: AddRecurringRule result - success=%d, body=%s", 
+            success, resp.body.substr(0, 200).c_str());
+  return success;
 }
 
 bool Client::DeleteRecurringRule(int id)
