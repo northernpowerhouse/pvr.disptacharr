@@ -17,6 +17,8 @@
     <license>GPL-2.0-or-later</license>
     <assets>
       <icon>icon.png</icon>
+      <logo>logo.png</logo>
+      <fanart>fanart.png</fanart>
     </assets>
     <platform>all</platform>
   </extension>

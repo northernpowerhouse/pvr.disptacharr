@@ -1,7 +1,7 @@
 # Dispatcharr PVR Client for Kodi
 
 <p align="center">
-  <img src="pvr.dispatcharr/icon.png" alt="Dispatcharr PVR Client" width="256"/>
+  <img src="pvr.dispatcharr/logo.png" alt="Dispatcharr PVR Client" width="256"/>
 </p>
 
 A comprehensive Kodi PVR (Personal Video Recorder) addon that integrates with both Xtream Codes servers and Dispatcharr backend systems to provide live TV, EPG (Electronic Program Guide), and DVR (Digital Video Recording) functionality.
