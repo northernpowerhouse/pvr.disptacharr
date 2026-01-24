@@ -1,15 +1,15 @@
 cmake_minimum_required(VERSION 3.15)
 
-# For Windows with vcpkg, ensure we use the static-md triplet (static libs, dynamic CRT)
+# For Windows with vcpkg, use fully static triplet (static libs + static CRT)
 if(WIN32)
   # Set the vcpkg triplet if using vcpkg toolchain
   if(DEFINED CMAKE_TOOLCHAIN_FILE AND CMAKE_TOOLCHAIN_FILE MATCHES "vcpkg")
     if(NOT DEFINED VCPKG_TARGET_TRIPLET)
-      set(VCPKG_TARGET_TRIPLET "x64-windows-static-md" CACHE STRING "")
+      set(VCPKG_TARGET_TRIPLET "x64-windows-static" CACHE STRING "")
     endif()
   endif()
-  # Force dynamic CRT for MSVC
-  set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreadedDLL" CACHE STRING "" FORCE)
+  # Use static CRT to match vcpkg x64-windows-static triplet
+  set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>" CACHE STRING "" FORCE)
 endif()
 
 set(ADDON_ID "pvr.dispatcharr")
@@ -117,9 +117,9 @@ else()
   set_target_properties(${ADDON_ID} PROPERTIES PREFIX "")
 
   if(WIN32)
-    # Use dynamic CRT via CMake property (matches vcpkg x64-windows-static-md triplet)
+    # Use static CRT via CMake property (matches vcpkg x64-windows-static triplet)
     set_target_properties(${ADDON_ID} PROPERTIES
-      MSVC_RUNTIME_LIBRARY "MultiThreadedDLL"
+      MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>"
     )
     # Exception handling and RTTI  
     target_compile_options(${ADDON_ID} PRIVATE /EHsc /GR)
