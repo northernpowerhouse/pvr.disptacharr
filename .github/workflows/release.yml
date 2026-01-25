@@ -50,6 +50,7 @@ jobs:
         run: |
           choco install cmake --installargs 'ADD_CMAKE_TO_PATH=System' -y
           choco install zip -y
+          choco install curl -y
           echo "Build dependencies installed successfully"
 
       - name: Build and stage addon
