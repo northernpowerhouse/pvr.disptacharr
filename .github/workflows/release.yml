@@ -124,7 +124,6 @@ jobs:
           echo "Using version: $VERSION"
 
       - name: Create release ZIP
-        if: github.event_name == 'release'
         shell: bash
         env:
           MATRIX_OS: ${{ matrix.os }}
@@ -137,7 +136,7 @@ jobs:
             *) PLAT="$MATRIX_OS" ;;
           esac
           ZIP_NAME="pvr.dispatcharr-${VERSION}-${PLAT}.zip"
-          (cd dist/pvr.dispatcharr && zip -qr "../$ZIP_NAME" .)
+          (cd dist && zip -qr "$ZIP_NAME" pvr.dispatcharr)
           echo "Created release ZIP: $ZIP_NAME"
           ls -lah dist/*.zip
 
@@ -284,13 +283,12 @@ jobs:
           echo "Using version: $VERSION"
 
       - name: Create release ZIP
-        if: github.event_name == 'release'
         env:
           VERSION: ${{ steps.version.outputs.version }}
         run: |
           set -e
           ZIP_NAME="pvr.dispatcharr-${VERSION}-android-${{ matrix.abi }}.zip"
-          (cd dist/pvr.dispatcharr && zip -qr "../$ZIP_NAME" .)
+          (cd dist && zip -qr "$ZIP_NAME" pvr.dispatcharr)
           echo "Created release ZIP: $ZIP_NAME"
           ls -lah dist/*.zip
 
