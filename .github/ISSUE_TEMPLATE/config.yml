@@ -1,0 +1,12 @@
+# Configure issue templates
+# Disable blank issues so the template chooser is shown and users must select a template
+blank_issues_enabled: false
+
+# Helpful quick links shown on the new issue page
+contact_links:
+  - name: "Report a bug"
+    url: "https://github.com/northernpowerhouse/pvr.disptacharr/issues/new?assignees=&labels=bug&template=bug_report.yml"
+    about: "Report a bug using the bug report form (attach logs and steps to reproduce)."
+  - name: "Request a feature"
+    url: "https://github.com/northernpowerhouse/pvr.disptacharr/issues/new?assignees=&labels=enhancement&template=feature_request.yml"
+    about: "Request a new feature using the feature request form."
