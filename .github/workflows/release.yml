@@ -108,6 +108,12 @@ jobs:
           if [[ -z "$DLL_FILE" ]]; then echo "No .dll found in $ADDON_DIR"; find "$ADDON_DIR" -maxdepth 2 -type f -print; exit 1; fi
           echo "Found DLL: $DLL_FILE"
           file "$DLL_FILE" || true
+          # Check DLL architecture using dumpbin (from MSVC toolset)
+          if command -v dumpbin.exe &>/dev/null; then
+            echo "Checking DLL architecture with dumpbin:"
+            dumpbin.exe //HEADERS "$DLL_FILE" | grep -A3 "FILE HEADER VALUES" || true
+            dumpbin.exe //HEADERS "$DLL_FILE" | grep "machine" || true
+          fi
           echo "Windows DLL found and checked"
 
       - name: Set version
@@ -144,7 +150,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: pvr.dispatcharr-${{ steps.version.outputs.version }}-${{ matrix.label }}
-          path: dist/*
+          path: dist/*.zip
 
       - name: Publish GitHub Release asset
         if: github.event_name == 'release'
@@ -296,7 +302,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: pvr.dispatcharr-${{ steps.version.outputs.version }}-android-${{ matrix.abi }}
-          path: dist/*
+          path: dist/*.zip
 
       - name: Publish GitHub Release asset
         if: github.event_name == 'release'
