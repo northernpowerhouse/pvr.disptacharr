@@ -131,9 +131,7 @@ else()
     target_link_options(${ADDON_ID} PRIVATE 
       /OPT:REF 
       /OPT:ICF
-      /FORCE:MULTIPLE
       "/IGNORE:4006"
-      "/IGNORE:4088"
     )
     # Define common Windows macros
     target_compile_definitions(${ADDON_ID} PRIVATE 
