@@ -1,0 +1,98 @@
+name: Feature request
+about: Suggest a new feature or improvement for the addon.
+title: "[Feature] "
+labels: [enhancement]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for suggesting an improvement! Please provide as much context as possible so we can evaluate and prioritise the request.
+
+  - type: input
+    id: addon_version
+    attributes:
+      label: Addon version (optional)
+      description: The version of the pvr.dispatcharr addon where the feature would apply (e.g., 1.1.0)
+      placeholder: 1.1.0
+    validations:
+      required: false
+
+  - type: input
+    id: kodi_version
+    attributes:
+      label: Kodi version (optional)
+      description: The version of Kodi you are running (e.g., 21.3-Omega)
+      placeholder: 21.3-Omega
+    validations:
+      required: false
+
+  - type: input
+    id: dispatcharr_version
+    attributes:
+      label: Dispatcharr version (optional)
+      description: The version of Dispatcharr server you are using (e.g., 2.0.1)
+      placeholder: 2.0.1
+    validations:
+      required: false
+
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary of the feature
+      description: One-line summary of the requested feature.
+      placeholder: "e.g., Add channel grouping by genre"
+    validations:
+      required: true
+
+  - type: textarea
+    id: motivation
+    attributes:
+      label: Motivation / Use case
+      description: Why is this feature useful? Who would it benefit?
+      placeholder: "Describe the problem this solves and who benefits from it."
+    validations:
+      required: true
+
+  - type: textarea
+    id: details
+    attributes:
+      label: Proposed behaviour / Implementation details
+      description: Details on how you expect the feature to work, UI changes, or implementation notes.
+      placeholder: "Describe the desired behaviour, UI mockups, or technical approach."
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Any alternative approaches or trade-offs.
+      placeholder: "e.g., Could be implemented as a plugin or server-side feature"
+    validations:
+      required: false
+
+  - type: dropdown
+    id: priority
+    attributes:
+      label: Priority
+      description: How important is this feature to you?
+      options:
+        - label: Low
+          value: low
+        - label: Medium
+          value: medium
+        - label: High
+          value: high
+    validations:
+      required: false
+
+  - type: attachments
+    id: attachments
+    attributes:
+      label: Attachments
+      description: Attach mockups, sample files, or screenshots that help explain the feature.
+
+  - type: markdown
+    attributes:
+      value: |
+        Thank you! We will review your request and may follow up with questions.
