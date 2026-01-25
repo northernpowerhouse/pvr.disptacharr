@@ -14,7 +14,7 @@ endif()
 
 set(ADDON_ID "pvr.dispatcharr")
 set(ADDON_NAME "Dispatcharr PVR Client")
-set(ADDON_VERSION "1.0.3")
+set(ADDON_VERSION "1.1.0")
 
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${PROJECT_SOURCE_DIR})
 
