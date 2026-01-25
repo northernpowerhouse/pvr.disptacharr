@@ -6,6 +6,7 @@
 
   <extension
     point="kodi.pvrclient"
+    library_windows="@ADDON_ID@.dll"
     library_osx="@ADDON_ID@.dylib"
     library_linux="@ADDON_ID@.linux.so"
     library_android="@ADDON_ID@.android.so"
