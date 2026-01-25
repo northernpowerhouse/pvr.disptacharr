@@ -1,8 +1,19 @@
 cmake_minimum_required(VERSION 3.15)
 
+# Set CMAKE_PREFIX_PATH early to find Kodi-provided dependencies
+if(NOT CMAKE_PREFIX_PATH)
+  if(DEFINED ENV{KODI_BUILD_DIR})
+    list(APPEND CMAKE_PREFIX_PATH "${ENV{KODI_BUILD_DIR}}/project/BuildDependencies/x64")
+  else()
+    # Fallback for standard Kodi location
+    list(APPEND CMAKE_PREFIX_PATH "C:/Users/joe/dev/pvr/xbmc/project/BuildDependencies/x64")
+  endif()
+endif()
+
 set(ADDON_ID "pvr.dispatcharr")
 set(ADDON_NAME "Dispatcharr PVR Client")
-set(ADDON_VERSION "1.1.0")
+
+project(${ADDON_ID} LANGUAGES CXX)
 
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${PROJECT_SOURCE_DIR})
 
@@ -10,12 +21,40 @@ set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${PROJECT_SOURCE_DIR})
 find_package(Kodi QUIET)
 
 if(Kodi_FOUND)
-  project(${ADDON_ID})
+
+  
+  # Read version from version.txt (after project() declaration)
+  file(READ ${CMAKE_CURRENT_SOURCE_DIR}/version.txt ADDON_VERSION)
+  string(STRIP "${ADDON_VERSION}" ADDON_VERSION)
+  
   set(CMAKE_CXX_STANDARD 17)
   set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-  # Find libcurl (Kodi exports this, but we need headers)
-  find_package(CURL REQUIRED)
+  # For Kodi addon builds, try to use CURL from dependencies first
+  # Check if CURL was already provided by Kodi's dependency system
+  set(CURL_INCLUDE_DIR)
+  set(CURL_LIBRARY)
+  
+  # Try finding CURL in the CMAKE_PREFIX_PATH (set by Kodi)
+  find_package(CURL QUIET)
+  
+  if(NOT CURL_FOUND)
+    # If not found via standard find, try to locate it in xbmc BuildDependencies as fallback
+    find_path(CURL_INCLUDE_DIR NAMES curl/curl.h
+              PATHS "C:/Users/joe/dev/pvr/xbmc/project/BuildDependencies/x64/include"
+              NO_DEFAULT_PATH)
+    find_library(CURL_LIBRARY NAMES libcurl
+                 PATHS "C:/Users/joe/dev/pvr/xbmc/project/BuildDependencies/x64/lib"
+                 NO_DEFAULT_PATH)
+    if(CURL_INCLUDE_DIR AND CURL_LIBRARY)
+      message(STATUS "Found CURL in xbmc BuildDependencies")
+      set(CURL_FOUND TRUE)
+    endif()
+  endif()
+  
+  if(NOT CURL_FOUND)
+    message(FATAL_ERROR "CURL library not found. Please ensure Kodi dependencies are properly downloaded.")
+  endif()
   
   # Try to find system pugixml, otherwise use bundled version
   find_package(pugixml QUIET)
@@ -24,20 +63,26 @@ if(Kodi_FOUND)
     message(STATUS "Using system pugixml")
     include_directories(${KODI_INCLUDE_DIR}/..
                         ${PUGIXML_INCLUDE_DIRS}
-                        ${CURL_INCLUDE_DIRS})
-    set(DEPLIBS ${PUGIXML_LIBRARIES} ${CURL_LIBRARIES})
+                        ${CURL_INCLUDE_DIR})
+    set(DEPLIBS ${PUGIXML_LIBRARIES} ${CURL_LIBRARY})
   else()
     message(STATUS "Using bundled pugixml")
     include_directories(${KODI_INCLUDE_DIR}/..
                         ${CMAKE_SOURCE_DIR}/src/pugixml
-                        ${CURL_INCLUDE_DIRS})
-    set(DEPLIBS ${CURL_LIBRARIES})
+                        ${CURL_INCLUDE_DIR})
+    set(DEPLIBS ${CURL_LIBRARY})
   endif()
 
   set(XTC_SOURCES
     src/addon.cpp
     src/xtream_client.cpp
     src/dispatcharr_client.cpp
+  )
+
+  set(XTC_HEADERS
+    src/dispatcharr_client.h
+    src/xtream_client.h
+    src/json.hpp
   )
   
   # Add bundled pugixml if not using system version
@@ -55,10 +100,15 @@ if(Kodi_FOUND)
   
   build_addon(${ADDON_ID} XTC DEPLIBS)
 
+  target_compile_definitions(${ADDON_ID} PRIVATE 
+    ADDON_ID="${ADDON_ID}"
+    ADDON_NAME="${ADDON_NAME}" 
+    ADDON_VERSION="${ADDON_VERSION}"
+  )
+
   include(CPack)
 else()
   # Standalone build using only the dev kit headers.
-  project(pvr_xtreamcodes LANGUAGES CXX)
 
   set(CMAKE_CXX_STANDARD 17)
   set(CMAKE_CXX_STANDARD_REQUIRED ON)

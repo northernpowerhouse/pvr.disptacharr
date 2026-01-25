@@ -1,26 +1,16 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<addon id="@ADDON_ID@" version="@ADDON_VERSION@" name="@ADDON_NAME@" provider-name="Denunciadeiro">
-  <requires>
-    <import addon="kodi.binary.instance.pvr" version="8.2.0"/>
-  </requires>
-
-  <extension
-    point="kodi.pvrclient"
-    library_windows="@ADDON_ID@.dll"
-    library_osx="@ADDON_ID@.dylib"
-    library_linux="@ADDON_ID@.linux.so"
-    library_android="@ADDON_ID@.android.so"
-    />
-
+<addon id="@ADDON_ID@" version="1.1.0" name="@ADDON_NAME@" provider-name="Denunciadeiro">
+  <requires>@ADDON_DEPENDS@</requires>
+  <extension point="kodi.pvrclient" library_@PLATFORM@="@LIBRARY_FILENAME@" />
   <extension point="xbmc.addon.metadata">
     <summary lang="en_GB">Dispatcharr PVR Client</summary>
     <description lang="en_GB">Live TV PVR client for Dispatcharr.</description>
     <license>GPL-2.0-or-later</license>
+    <platform>all</platform>
     <assets>
       <icon>icon.png</icon>
       <logo>logo.png</logo>
       <fanart>fanart.png</fanart>
     </assets>
-    <platform>all</platform>
   </extension>
 </addon>

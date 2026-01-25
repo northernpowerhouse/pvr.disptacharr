@@ -16,10 +16,6 @@ jobs:
         include:
           - os: ubuntu-22.04
             label: linux
-          - os: windows-2022
-            label: windows
-            cmake_generator: "Visual Studio 17 2022"
-            cmake_generator_platform: "x64"
     name: Build ${{ matrix.label }}
     runs-on: ${{ matrix.os }}
     steps:

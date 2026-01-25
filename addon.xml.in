@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<addon id="@ADDON_ID@" version="@ADDON_VERSION@" name="@ADDON_NAME@" provider-name="Denunciadeiro">
+  <requires>
+    <import addon="kodi.binary.instance.pvr" version="8.2.0"/>
+  </requires>
+  <extension point="kodi.pvrclient" library_windows="@ADDON_ID@.dll" library_osx="@ADDON_ID@.dylib" library_linux="@ADDON_ID@.so.10" library_android="lib@ADDON_ID@.so"/>
+  <extension point="xbmc.addon.metadata">
+    <summary>Dispatcharr PVR Client</summary>
+    <description>PVR addon for Dispatcharr</description>
+  </extension>
+</addon>
