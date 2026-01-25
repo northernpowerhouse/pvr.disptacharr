@@ -50,13 +50,6 @@ jobs:
         run: |
           choco install cmake --installargs 'ADD_CMAKE_TO_PATH=System' -y
           choco install zip -y
-          # Install vcpkg and curl (using fully static triplet - static libs + static CRT)
-          git clone https://github.com/Microsoft/vcpkg.git C:\vcpkg
-          C:\vcpkg\bootstrap-vcpkg.bat
-          C:\vcpkg\vcpkg install curl:x64-windows-static
-          echo "VCPKG_ROOT=C:\vcpkg" >> $env:GITHUB_ENV
-          echo "CMAKE_TOOLCHAIN_FILE=C:\vcpkg\scripts\buildsystems\vcpkg.cmake" >> $env:GITHUB_ENV
-          echo "VCPKG_TARGET_TRIPLET=x64-windows-static" >> $env:GITHUB_ENV
           echo "Build dependencies installed successfully"
 
       - name: Build and stage addon
@@ -70,10 +63,6 @@ jobs:
         run: |
           echo "KODI_ADDON_SDK=$KODI_ADDON_SDK"
           ls -la "$KODI_ADDON_SDK/include/kodi/addon-instance/" || true
-          # On Windows, set the vcpkg triplet for fully static build
-          if [[ "$RUNNER_OS" == "Windows" ]]; then
-            export CMAKE_EXTRA_ARGS="-DVCPKG_TARGET_TRIPLET=x64-windows-static"
-          fi
           if [[ -n "$VERSION" ]]; then
             VERSION="${VERSION#v}"  # Strip 'v' prefix
             ./build.sh --skip-zip --version "$VERSION" 2>&1

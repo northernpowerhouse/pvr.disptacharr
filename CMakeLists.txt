@@ -1,17 +1,5 @@
 cmake_minimum_required(VERSION 3.15)
 
-# For Windows with vcpkg, use fully static triplet (static libs + static CRT)
-if(WIN32)
-  # Set the vcpkg triplet if using vcpkg toolchain
-  if(DEFINED CMAKE_TOOLCHAIN_FILE AND CMAKE_TOOLCHAIN_FILE MATCHES "vcpkg")
-    if(NOT DEFINED VCPKG_TARGET_TRIPLET)
-      set(VCPKG_TARGET_TRIPLET "x64-windows-static" CACHE STRING "")
-    endif()
-  endif()
-  # Use static CRT to match vcpkg x64-windows-static triplet
-  set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>" CACHE STRING "" FORCE)
-endif()
-
 set(ADDON_ID "pvr.dispatcharr")
 set(ADDON_NAME "Dispatcharr PVR Client")
 set(ADDON_VERSION "1.1.0")
@@ -117,33 +105,15 @@ else()
   set_target_properties(${ADDON_ID} PROPERTIES PREFIX "")
 
   if(WIN32)
-    # Use static CRT via CMake property (matches vcpkg x64-windows-static triplet)
-    set_target_properties(${ADDON_ID} PROPERTIES
-      MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>"
-    )
     # Exception handling and RTTI  
     target_compile_options(${ADDON_ID} PRIVATE /EHsc /GR)
-    # Linker options:
-    # /OPT:REF removes unreferenced code/data
-    # /OPT:ICF enables identical COMDAT folding
-    # /IGNORE:4006 suppresses warnings about duplicate weak symbols (_Avx2WmemEnabledWeakValue)
-    # /IGNORE:4088 suppresses the /FORCE warning (we don't actually use /FORCE anymore)
-    target_link_options(${ADDON_ID} PRIVATE 
-      /OPT:REF 
-      /OPT:ICF
-      "/IGNORE:4006"
-    )
     # Define common Windows macros
     target_compile_definitions(${ADDON_ID} PRIVATE 
       _CRT_SECURE_NO_WARNINGS
       WIN32_LEAN_AND_MEAN
       NOMINMAX
-      CURL_STATICLIB
     )
   endif()
-
-  # CMAKE_MSVC_RUNTIME_LIBRARY property automatically handles CRT linkage
-  # No manual /NODEFAULTLIB flags needed - let CMake select the correct import libraries
 
   # === DEBUG: Print build configuration ===
   message(STATUS "=== ADDON BUILD CONFIGURATION ===")
