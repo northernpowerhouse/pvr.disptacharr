@@ -27,6 +27,10 @@ msgctxt "#30005"
 msgid "Request timeout (seconds)"
 msgstr "Request timeout (seconds)"
 
+msgctxt "#30006"
+msgid "Dispatcharr Password"
+msgstr "Dispatcharr Password"
+
 
 msgctxt "#30100"
 msgid "Streaming"
