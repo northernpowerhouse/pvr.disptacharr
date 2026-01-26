@@ -128,22 +128,23 @@ jobs:
             windows-*) PLAT=windows ;;
             *) PLAT="$MATRIX_OS" ;;
           esac
+          mkdir -p release-zips
           ZIP_NAME="pvr.dispatcharr-${VERSION}-${PLAT}.zip"
-          (cd dist && zip -qr "$ZIP_NAME" pvr.dispatcharr)
+          (cd dist && zip -qr "../release-zips/$ZIP_NAME" pvr.dispatcharr)
           echo "Created release ZIP: $ZIP_NAME"
-          ls -lah dist/*.zip
+          ls -lah release-zips/*.zip
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: pvr.dispatcharr-${{ steps.version.outputs.version }}-${{ matrix.label }}
-          path: dist/pvr.dispatcharr
+          path: dist
 
       - name: Publish GitHub Release asset
         if: github.event_name == 'release'
         uses: softprops/action-gh-release@v2
         with:
-          files: dist/*.zip
+          files: release-zips/*.zip
           generate_release_notes: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -154,7 +155,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        abi: [armeabi-v7a]
+        abi: [armeabi-v7a, arm64-v8a]
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -281,22 +282,23 @@ jobs:
           VERSION: ${{ steps.version.outputs.version }}
         run: |
           set -e
+          mkdir -p release-zips
           ZIP_NAME="pvr.dispatcharr-${VERSION}-android-${{ matrix.abi }}.zip"
-          (cd dist && zip -qr "$ZIP_NAME" pvr.dispatcharr)
+          (cd dist && zip -qr "../release-zips/$ZIP_NAME" pvr.dispatcharr)
           echo "Created release ZIP: $ZIP_NAME"
-          ls -lah dist/*.zip
+          ls -lah release-zips/*.zip
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: pvr.dispatcharr-${{ steps.version.outputs.version }}-android-${{ matrix.abi }}
-          path: dist/pvr.dispatcharr
+          path: dist
 
       - name: Publish GitHub Release asset
         if: github.event_name == 'release'
         uses: softprops/action-gh-release@v2
         with:
-          files: dist/*.zip
+          files: release-zips/*.zip
           generate_release_notes: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
