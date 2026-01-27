@@ -986,6 +986,12 @@ public:
           m_activeCatchup = pendingIt->second;
           m_activeCatchupChannelUid = channelUid;
         }
+        else
+        {
+          // Pending catchup expired or invalid - clear any active catchup state
+          m_activeCatchup = PendingCatchup{};
+          m_activeCatchupChannelUid = 0;
+        }
         // Clear the pending state after consuming (or if expired)
         m_pendingCatchupByChannel.erase(pendingIt);
       }
