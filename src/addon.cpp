@@ -1281,6 +1281,15 @@ public:
     return PVR_ERROR_NOT_IMPLEMENTED;
   }
 
+  void CloseLiveStream() override
+  {
+    std::lock_guard<std::mutex> lock(m_mutex);
+    // Clear all active stream state that may differ between channels
+    m_activeCatchup = PendingCatchup{};
+    m_activeCatchupChannelUid = 0;
+    kodi::Log(ADDON_LOG_DEBUG, "CloseLiveStream: cleared active stream state");
+  }
+
   PVR_ERROR GetEPGTagStreamProperties(const kodi::addon::PVREPGTag& tag,
                                      std::vector<kodi::addon::PVRStreamProperty>& properties) override
   {
