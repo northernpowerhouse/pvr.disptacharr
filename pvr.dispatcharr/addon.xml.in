@@ -1,7 +1,13 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <addon id="@ADDON_ID@" version="1.1.0" name="@ADDON_NAME@" provider-name="Denunciadeiro">
   <requires>@ADDON_DEPENDS@</requires>
-  <extension point="kodi.pvrclient" library_@PLATFORM@="@LIBRARY_FILENAME@" />
+  <extension
+    point="kodi.pvrclient"
+    library="libpvr.dispatcharr.so"
+    library_windows="pvr.dispatcharr.dll"
+    library_osx="pvr.dispatcharr.dylib"
+    library_linux="pvr.dispatcharr.so.10"
+    library_android="libpvr.dispatcharr.so"/>
   <extension point="xbmc.addon.metadata">
     <summary lang="en_GB">Dispatcharr PVR Client</summary>
     <description lang="en_GB">Live TV PVR client for Dispatcharr.</description>

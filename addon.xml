@@ -6,6 +6,7 @@
 
   <extension
     point="kodi.pvrclient"
+    library="libpvr.dispatcharr.so"
     library_windows="pvr.dispatcharr.dll"
     library_osx="pvr.dispatcharr.dylib"
     library_linux="pvr.dispatcharr.so.10"

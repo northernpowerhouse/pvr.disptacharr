@@ -76,7 +76,7 @@ jobs:
           set -e
           ADDON_DIR="dist/pvr.dispatcharr"
           if [[ ! -d "$ADDON_DIR" ]]; then echo "Addon directory not found: $ADDON_DIR"; ls -lah dist || true; exit 1; fi
-          SO_FILE=$(find "$ADDON_DIR" -name '*.so' -print -quit)
+          SO_FILE=$(find "$ADDON_DIR" -name '*.so*' -print -quit)
           if [[ -z "$SO_FILE" ]]; then echo "No .so found in $ADDON_DIR"; find "$ADDON_DIR" -maxdepth 2 -type f -print; exit 1; fi
           echo "Found SO: $SO_FILE"
           ldd "$SO_FILE" | tee /dev/stderr
