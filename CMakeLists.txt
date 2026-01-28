@@ -204,9 +204,9 @@ else()
   elseif(WIN32)
     set_target_properties(${ADDON_ID} PROPERTIES SUFFIX ".dll")
   elseif(ANDROID)
-    set_target_properties(${ADDON_ID} PROPERTIES SUFFIX ".android.so")
+    set_target_properties(${ADDON_ID} PROPERTIES PREFIX "lib" SUFFIX ".so")
   else()
-    set_target_properties(${ADDON_ID} PROPERTIES SUFFIX ".linux.so")
+    set_target_properties(${ADDON_ID} PROPERTIES SUFFIX ".so.10")
   endif()
 
   target_compile_definitions(${ADDON_ID} PRIVATE
