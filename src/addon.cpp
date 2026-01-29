@@ -983,6 +983,12 @@ public:
         {
           pendingCatchupUrl = pendingIt->second.url;
         }
+        else
+        {
+          // Pending catchup expired or invalid - clear any active catchup state
+          m_activeCatchup = PendingCatchup{};
+          m_activeCatchupChannelUid = 0;
+        }
         // Clear the pending state after consuming (or if expired)
         m_pendingCatchupByChannel.erase(pendingIt);
       }
