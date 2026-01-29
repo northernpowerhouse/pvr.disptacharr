@@ -1281,15 +1281,6 @@ public:
     return PVR_ERROR_NOT_IMPLEMENTED;
   }
 
-  bool OpenLiveStream(const kodi::addon::PVRChannel& channel) override
-  {
-    // When using inputstream.ffmpegdirect via GetChannelStreamProperties(),
-    // Kodi still calls OpenLiveStream() to signal stream readiness.
-    // Return true to indicate the stream is ready for the external inputstream to handle.
-    kodi::Log(ADDON_LOG_DEBUG, "OpenLiveStream: channel uid=%u", channel.GetUniqueId());
-    return true;
-  }
-
   void CloseLiveStream() override
   {
     std::lock_guard<std::mutex> lock(m_mutex);
