@@ -982,18 +982,9 @@ public:
         if (pendingIt->second.expiresAtMs >= nowMs && !pendingIt->second.url.empty())
         {
           pendingCatchupUrl = pendingIt->second.url;
-          // Store as active catchup for GetStreamTimes/CanSeekStream/IsRealTimeStream
-          m_activeCatchup = pendingIt->second;
-          m_activeCatchupChannelUid = channelUid;
         }
         // Clear the pending state after consuming (or if expired)
         m_pendingCatchupByChannel.erase(pendingIt);
-      }
-      else
-      {
-        // Starting a non-catchup (live) stream - clear any active catchup state
-        m_activeCatchup = PendingCatchup{};
-        m_activeCatchupChannelUid = 0;
       }
     }
     if (!uidToStream)
@@ -1239,55 +1230,6 @@ public:
     }
 
     return PVR_ERROR_NO_ERROR;
-  }
-
-  bool CanSeekStream() override
-  {
-    // Catchup streams support seeking via HTTP range requests
-    std::lock_guard<std::mutex> lock(m_mutex);
-    return m_activeCatchupChannelUid != 0 && m_activeCatchup.programStart > 0;
-  }
-
-  bool IsRealTimeStream() override
-  {
-    // When playing catchup, this is NOT a realtime stream
-    std::lock_guard<std::mutex> lock(m_mutex);
-    return m_activeCatchupChannelUid == 0;
-  }
-
-  PVR_ERROR GetStreamTimes(kodi::addon::PVRStreamTimes& times) override
-  {
-    std::lock_guard<std::mutex> lock(m_mutex);
-    
-    // Check if we have an active catchup stream
-    if (m_activeCatchupChannelUid != 0 && 
-        m_activeCatchup.programStart > 0 && 
-        m_activeCatchup.programEnd > m_activeCatchup.programStart)
-    {
-      // Set timing information for seeking
-      times.SetStartTime(m_activeCatchup.programStart);
-      times.SetPTSStart(0); // Start at beginning
-      times.SetPTSBegin(0); // Can seek to beginning
-      
-      // Duration in microseconds
-      const int64_t durationSec = m_activeCatchup.programEnd - m_activeCatchup.programStart;
-      times.SetPTSEnd(durationSec * 1000000LL); // Convert to microseconds
-      
-      kodi::Log(ADDON_LOG_DEBUG, "GetStreamTimes: start=%ld, end=%ld, duration=%lld sec",
-                m_activeCatchup.programStart, m_activeCatchup.programEnd, durationSec);
-      return PVR_ERROR_NO_ERROR;
-    }
-    
-    return PVR_ERROR_NOT_IMPLEMENTED;
-  }
-
-  void CloseLiveStream() override
-  {
-    std::lock_guard<std::mutex> lock(m_mutex);
-    // Clear all active stream state that may differ between channels
-    m_activeCatchup = PendingCatchup{};
-    m_activeCatchupChannelUid = 0;
-    kodi::Log(ADDON_LOG_DEBUG, "CloseLiveStream: cleared active stream state");
   }
 
   PVR_ERROR GetEPGTagStreamProperties(const kodi::addon::PVREPGTag& tag,
@@ -2284,10 +2226,6 @@ private:
     time_t programEnd = 0;
   };
   std::unordered_map<unsigned int, PendingCatchup> m_pendingCatchupByChannel;
-  
-  // Active catchup playback - persists during playback for GetStreamTimes/CanSeekStream/IsRealTimeStream
-  PendingCatchup m_activeCatchup;
-  unsigned int m_activeCatchupChannelUid = 0;
 
   std::string m_cacheSignatureAttempted;
 
