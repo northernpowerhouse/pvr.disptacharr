@@ -110,6 +110,10 @@ if(Kodi_FOUND)
 else()
   # Standalone build using only the dev kit headers.
 
+  # Read version from version.txt
+  file(READ ${CMAKE_CURRENT_SOURCE_DIR}/version.txt ADDON_VERSION)
+  string(STRIP "${ADDON_VERSION}" ADDON_VERSION)
+
   set(CMAKE_CXX_STANDARD 17)
   set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
