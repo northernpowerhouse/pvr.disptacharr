@@ -1281,6 +1281,15 @@ public:
     return PVR_ERROR_NOT_IMPLEMENTED;
   }
 
+  bool OpenLiveStream(const kodi::addon::PVRChannel& channel) override
+  {
+    // When using inputstream.ffmpegdirect via GetChannelStreamProperties(),
+    // Kodi still calls OpenLiveStream() to signal stream readiness.
+    // Return true to indicate the stream is ready for the external inputstream to handle.
+    kodi::Log(ADDON_LOG_DEBUG, "OpenLiveStream: channel uid=%u", channel.GetUniqueId());
+    return true;
+  }
+
   void CloseLiveStream() override
   {
     std::lock_guard<std::mutex> lock(m_mutex);
@@ -1288,6 +1297,15 @@ public:
     m_activeCatchup = PendingCatchup{};
     m_activeCatchupChannelUid = 0;
     kodi::Log(ADDON_LOG_DEBUG, "CloseLiveStream: cleared active stream state");
+  }
+
+  PVR_ERROR StreamClosed() override
+  {
+    // Called when the stream is closed and both SetHandlesInputStream()
+    // and SetHandlesDemuxing() are false (external inputstream handling).
+    // Allows cleanup prior to a new stream being opened.
+    kodi::Log(ADDON_LOG_DEBUG, "StreamClosed: stream cleanup notification received");
+    return PVR_ERROR_NO_ERROR;
   }
 
   PVR_ERROR GetEPGTagStreamProperties(const kodi::addon::PVREPGTag& tag,
