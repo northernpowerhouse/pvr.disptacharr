@@ -1299,15 +1299,6 @@ public:
     kodi::Log(ADDON_LOG_DEBUG, "CloseLiveStream: cleared active stream state");
   }
 
-  PVR_ERROR StreamClosed() override
-  {
-    // Called when the stream is closed and both SetHandlesInputStream()
-    // and SetHandlesDemuxing() are false (external inputstream handling).
-    // Allows cleanup prior to a new stream being opened.
-    kodi::Log(ADDON_LOG_DEBUG, "StreamClosed: stream cleanup notification received");
-    return PVR_ERROR_NO_ERROR;
-  }
-
   PVR_ERROR GetEPGTagStreamProperties(const kodi::addon::PVREPGTag& tag,
                                      std::vector<kodi::addon::PVRStreamProperty>& properties) override
   {
