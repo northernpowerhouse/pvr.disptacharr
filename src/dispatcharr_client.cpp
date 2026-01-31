@@ -498,7 +498,11 @@ bool Client::DeleteSeriesRule(const std::string& tvgId)
   // URL encode? Assuming tvgId is safe-ish or basic chars
   auto resp = Request("DELETE", "/api/channels/series-rules/" + tvgId + "/");
   // HTTP 204 No Content is the correct response for DELETE
-  return resp.statusCode == 200 || resp.statusCode == 204;
+  bool success = (resp.statusCode == 200 || resp.statusCode == 204);
+  kodi::Log(success ? ADDON_LOG_DEBUG : ADDON_LOG_ERROR,
+            "pvr.dispatcharr: DeleteSeriesRule result - success=%d, statusCode=%d",
+            success, resp.statusCode);
+  return success;
 }
 
 bool Client::FetchRecurringRules(std::vector<RecurringRule>& outRules)
@@ -573,7 +577,11 @@ bool Client::DeleteRecurringRule(int id)
   if (!EnsureToken()) return false;
   auto resp = Request("DELETE", "/api/channels/recurring-rules/" + std::to_string(id) + "/");
   // HTTP 204 No Content is the correct response for DELETE
-  return resp.statusCode == 200 || resp.statusCode == 204;
+  bool success = (resp.statusCode == 200 || resp.statusCode == 204);
+  kodi::Log(success ? ADDON_LOG_DEBUG : ADDON_LOG_ERROR,
+            "pvr.dispatcharr: DeleteRecurringRule result - success=%d, statusCode=%d",
+            success, resp.statusCode);
+  return success;
 }
 
 bool Client::FetchChannels(std::vector<DispatchChannel>& outChannels)
@@ -691,7 +699,11 @@ bool Client::DeleteRecording(int id)
   if (!EnsureToken()) return false;
   auto resp = Request("DELETE", "/api/channels/recordings/" + std::to_string(id) + "/");
   // HTTP 204 No Content is the correct response for DELETE
-  return resp.statusCode == 200 || resp.statusCode == 204;
+  bool success = (resp.statusCode == 200 || resp.statusCode == 204);
+  kodi::Log(success ? ADDON_LOG_DEBUG : ADDON_LOG_ERROR,
+            "pvr.dispatcharr: DeleteRecording result - success=%d, statusCode=%d",
+            success, resp.statusCode);
+  return success;
 }
 
 bool Client::ScheduleRecording(int channelId, time_t startTime, time_t endTime, const std::string& title)
@@ -705,7 +717,11 @@ bool Client::ScheduleRecording(int channelId, time_t startTime, time_t endTime, 
   
   auto resp = Request("POST", "/api/channels/recordings/", ss.str());
   // HTTP 201 Created is the correct success response for POST
-  return resp.statusCode == 200 || resp.statusCode == 201;
+  bool success = (resp.statusCode == 200 || resp.statusCode == 201);
+  kodi::Log(success ? ADDON_LOG_DEBUG : ADDON_LOG_ERROR,
+            "pvr.dispatcharr: ScheduleRecording result - success=%d, statusCode=%d, body=%s",
+            success, resp.statusCode, resp.body.substr(0, 200).c_str());
+  return success;
 }
 
 } // namespace dispatcharr

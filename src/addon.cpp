@@ -749,10 +749,15 @@ public:
               return PVR_ERROR_FAILED;
           }
           std::string title = timer.GetTitle(); 
+          kodi::Log(ADDON_LOG_DEBUG, "pvr.dispatcharr: AddTimer (series) - calling Dispatcharr API POST /api/channels/series-rules/ with tvg_id='%s', title='%s', mode='new'",
+                    tvgId.c_str(), title.c_str());
           // If title is empty?
           if (m_dispatcharrClient->AddSeriesRule(tvgId, title, "new")) {
+              kodi::Log(ADDON_LOG_DEBUG, "pvr.dispatcharr: AddTimer (series) - Dispatcharr API returned success");
               TriggerTimerUpdate();
               return PVR_ERROR_NO_ERROR;
+          } else {
+              kodi::Log(ADDON_LOG_ERROR, "pvr.dispatcharr: AddTimer (series) - Dispatcharr API returned failure");
           }
       }
       else if (typeId == 3) // Recurring
@@ -793,9 +798,14 @@ public:
           r.startDate = "2026-01-01"; // Dummy defaults as we don't present UI for date ranges in Kodi easily
           r.endDate = "2030-01-01";
           
+          kodi::Log(ADDON_LOG_DEBUG, "pvr.dispatcharr: AddTimer (recurring) - calling Dispatcharr API POST /api/channels/recurring-rules/ with channel=%d, name='%s', time=%s-%s",
+                    r.channelId, r.name.c_str(), r.startTime.c_str(), r.endTime.c_str());
           if (m_dispatcharrClient->AddRecurringRule(r)) {
+              kodi::Log(ADDON_LOG_DEBUG, "pvr.dispatcharr: AddTimer (recurring) - Dispatcharr API returned success");
               TriggerTimerUpdate();
               return PVR_ERROR_NO_ERROR;
+          } else {
+              kodi::Log(ADDON_LOG_ERROR, "pvr.dispatcharr: AddTimer (recurring) - Dispatcharr API returned failure");
           }
       }
       else // One-shot (Type 1 or default)
@@ -807,10 +817,14 @@ public:
               return PVR_ERROR_FAILED;
           }
           
+          kodi::Log(ADDON_LOG_DEBUG, "pvr.dispatcharr: AddTimer (one-shot) - calling Dispatcharr API POST /api/channels/recordings/ with channel=%d, title='%s'",
+                    dispatchChannelId, timer.GetTitle().c_str());
           if (m_dispatcharrClient->ScheduleRecording(dispatchChannelId, timer.GetStartTime(), timer.GetEndTime(), timer.GetTitle())) {
-              kodi::Log(ADDON_LOG_DEBUG, "pvr.dispatcharr: Timer created successfully, calling TriggerTimerUpdate");
+              kodi::Log(ADDON_LOG_DEBUG, "pvr.dispatcharr: AddTimer (one-shot) - Dispatcharr API returned success, calling TriggerTimerUpdate");
               TriggerTimerUpdate();
               return PVR_ERROR_NO_ERROR;
+          } else {
+              kodi::Log(ADDON_LOG_ERROR, "pvr.dispatcharr: AddTimer (one-shot) - Dispatcharr API returned failure");
           }
       }
 
@@ -823,6 +837,9 @@ public:
 
       unsigned int clientIndex = timer.GetClientIndex();
       
+      kodi::Log(ADDON_LOG_DEBUG, "pvr.dispatcharr: DeleteTimer called - clientIndex=%u, title='%s', force=%d",
+                clientIndex, timer.GetTitle().c_str(), force);
+      
       // Determine type based on ID range:
       // 10000-19999 = series rules
       // 20000-29999 = recurring rules  
@@ -831,16 +848,24 @@ public:
       if (clientIndex >= 30000) {
           // Scheduled recording - ID is clientIndex - 30000
           int recId = static_cast<int>(clientIndex - 30000);
+          kodi::Log(ADDON_LOG_DEBUG, "pvr.dispatcharr: DeleteTimer (one-shot) - calling Dispatcharr API DELETE /api/channels/recordings/%d/", recId);
           if (m_dispatcharrClient->DeleteRecording(recId)) {
+              kodi::Log(ADDON_LOG_DEBUG, "pvr.dispatcharr: DeleteTimer (one-shot) - Dispatcharr API returned success");
               TriggerTimerUpdate();
               return PVR_ERROR_NO_ERROR;
+          } else {
+              kodi::Log(ADDON_LOG_ERROR, "pvr.dispatcharr: DeleteTimer (one-shot) - Dispatcharr API returned failure");
           }
       } else if (clientIndex >= 20000) {
           // Recurring rule - ID is clientIndex - 20000
           int ruleId = static_cast<int>(clientIndex - 20000);
+          kodi::Log(ADDON_LOG_DEBUG, "pvr.dispatcharr: DeleteTimer (recurring) - calling Dispatcharr API DELETE /api/channels/recurring-rules/%d/", ruleId);
           if (m_dispatcharrClient->DeleteRecurringRule(ruleId)) {
+              kodi::Log(ADDON_LOG_DEBUG, "pvr.dispatcharr: DeleteTimer (recurring) - Dispatcharr API returned success");
               TriggerTimerUpdate();
               return PVR_ERROR_NO_ERROR;
+          } else {
+              kodi::Log(ADDON_LOG_ERROR, "pvr.dispatcharr: DeleteTimer (recurring) - Dispatcharr API returned failure");
           }
       } else if (clientIndex >= 10000) {
           // Series rule - need to look up by index since we use a counter
@@ -849,11 +874,20 @@ public:
           if (m_dispatcharrClient->FetchSeriesRules(series)) {
               size_t idx = clientIndex - 10000;
               if (idx < series.size()) {
+                  kodi::Log(ADDON_LOG_DEBUG, "pvr.dispatcharr: DeleteTimer (series) - calling Dispatcharr API DELETE /api/channels/series-rules/%s/",
+                            series[idx].tvgId.c_str());
                   if (m_dispatcharrClient->DeleteSeriesRule(series[idx].tvgId)) {
+                      kodi::Log(ADDON_LOG_DEBUG, "pvr.dispatcharr: DeleteTimer (series) - Dispatcharr API returned success");
                       TriggerTimerUpdate();
                       return PVR_ERROR_NO_ERROR;
+                  } else {
+                      kodi::Log(ADDON_LOG_ERROR, "pvr.dispatcharr: DeleteTimer (series) - Dispatcharr API returned failure");
                   }
+              } else {
+                  kodi::Log(ADDON_LOG_ERROR, "pvr.dispatcharr: DeleteTimer (series) - index %zu out of range (size=%zu)", idx, series.size());
               }
+          } else {
+              kodi::Log(ADDON_LOG_ERROR, "pvr.dispatcharr: DeleteTimer (series) - failed to fetch series rules list");
           }
       }
 
