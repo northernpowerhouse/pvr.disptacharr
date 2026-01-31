@@ -41,10 +41,8 @@ body:
       label: Dispatcharr debug logs attached
       description: Are the Dispatcharr debug logs attached to this issue?
       options:
-        - label: Yes
-          value: yes
-        - label: No
-          value: no
+        - "Yes"
+        - "No"
     validations:
       required: true
 
@@ -54,10 +52,8 @@ body:
       label: Kodi debug logs attached
       description: Are the Kodi debug logs attached to this issue?
       options:
-        - label: Yes
-          value: yes
-        - label: No
-          value: no
+        - "Yes"
+        - "No"
     validations:
       required: true
 
