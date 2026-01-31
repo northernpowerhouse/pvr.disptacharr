@@ -1,5 +1,5 @@
 name: Bug report
-about: Report a bug with the addon. Please provide logs and clear reproduction steps.
+description: Report a bug with the addon. Please provide logs and clear reproduction steps.
 title: "[Bug] "
 labels: [bug]
 body:
@@ -94,10 +94,6 @@ body:
         - Dispatcharr debug logs (set server log level to DEBUG if needed)
         - Kodi debug logs (enable debug logging in Kodi and reproduce the issue)
         - Any screenshots, sample playlists, or relevant files
-
-
-
----
 
 # Notes for maintainers
 # The above is a GitHub issue form; it enforces required fields and provides a clear checklist for reporters.
