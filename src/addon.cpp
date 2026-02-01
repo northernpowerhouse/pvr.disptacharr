@@ -581,10 +581,11 @@ public:
   {
       using namespace kodi::addon;
       // Type 1: One-Time Recording (manual, time-based)
+      // Used when user manually specifies start/end times
       {
           PVRTimerType t;
           t.SetId(1);
-          t.SetDescription("One-Time Recording");
+          t.SetDescription("One-Time Recording (Manual)");
           t.SetAttributes(
               PVR_TIMER_TYPE_IS_MANUAL |
               PVR_TIMER_TYPE_SUPPORTS_ENABLE_DISABLE |
@@ -624,6 +625,22 @@ public:
               PVR_TIMER_TYPE_SUPPORTS_END_TIME |
               PVR_TIMER_TYPE_SUPPORTS_FIRST_DAY |
               PVR_TIMER_TYPE_SUPPORTS_WEEKDAYS
+          );
+          types.push_back(t);
+      }
+      // Type 4: One-Time Recording (EPG-based)
+      // CRITICAL: This is used when user clicks "Record" on an EPG program
+      // Without this type, Kodi falls back to creating a local reminder instead!
+      {
+          PVRTimerType t;
+          t.SetId(4);
+          t.SetDescription("One-Time Recording (EPG)");
+          t.SetAttributes(
+              PVR_TIMER_TYPE_REQUIRES_EPG_TAG_ON_CREATE |
+              PVR_TIMER_TYPE_SUPPORTS_ENABLE_DISABLE |
+              PVR_TIMER_TYPE_SUPPORTS_CHANNELS |
+              PVR_TIMER_TYPE_SUPPORTS_START_TIME |
+              PVR_TIMER_TYPE_SUPPORTS_END_TIME
           );
           types.push_back(t);
       }
@@ -808,7 +825,7 @@ public:
               kodi::Log(ADDON_LOG_ERROR, "pvr.dispatcharr: AddTimer (recurring) - Dispatcharr API returned failure");
           }
       }
-      else // One-shot (Type 1 or default)
+      else // One-shot (Type 1 manual, Type 4 EPG-based, or default)
       {
           // Map Kodi channel UID to Dispatcharr channel ID
           int dispatchChannelId = m_dispatcharrClient->GetDispatchChannelId(static_cast<int>(chanUid));
@@ -817,8 +834,9 @@ public:
               return PVR_ERROR_FAILED;
           }
           
-          kodi::Log(ADDON_LOG_DEBUG, "pvr.dispatcharr: AddTimer (one-shot) - calling Dispatcharr API POST /api/channels/recordings/ with channel=%d, title='%s'",
-                    dispatchChannelId, timer.GetTitle().c_str());
+          const char* typeStr = (typeId == 4) ? "EPG one-shot" : "manual one-shot";
+          kodi::Log(ADDON_LOG_DEBUG, "pvr.dispatcharr: AddTimer (%s) - calling Dispatcharr API POST /api/channels/recordings/ with channel=%d, title='%s'",
+                    typeStr, dispatchChannelId, timer.GetTitle().c_str());
           if (m_dispatcharrClient->ScheduleRecording(dispatchChannelId, timer.GetStartTime(), timer.GetEndTime(), timer.GetTitle())) {
               kodi::Log(ADDON_LOG_DEBUG, "pvr.dispatcharr: AddTimer (one-shot) - Dispatcharr API returned success, calling TriggerTimerUpdate");
               TriggerTimerUpdate();
