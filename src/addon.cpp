@@ -1415,13 +1415,14 @@ public:
           properties.emplace_back("inputstream.ffmpegdirect.catchup_buffer_start_time", std::to_string(adjustedStartTime));
           properties.emplace_back("inputstream.ffmpegdirect.catchup_buffer_end_time", std::to_string(effectiveEnd));
           
-          // For ongoing programs: treat as realtime so the buffer grows toward live
+          // For ongoing programs: fixed buffer but don't terminate (continues past buffer end)
           // For finished programs: fixed buffer, terminate at end
+          // Keep is_realtime_stream=false for both to prevent seeking beyond buffer_end_time
           if (isOngoing)
           {
             properties.emplace_back("inputstream.ffmpegdirect.catchup_terminates", "false");
-            properties.emplace_back("inputstream.ffmpegdirect.is_realtime_stream", "true");
-            kodi::Log(ADDON_LOG_INFO, "GetEPGTagStreamProperties: ongoing program - realtime mode enabled");
+            properties.emplace_back("inputstream.ffmpegdirect.is_realtime_stream", "false");
+            kodi::Log(ADDON_LOG_INFO, "GetEPGTagStreamProperties: ongoing program - catchup continues past buffer end");
           }
           else
           {
