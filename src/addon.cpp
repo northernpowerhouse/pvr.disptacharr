@@ -1302,63 +1302,6 @@ public:
     kodi::Log(ADDON_LOG_DEBUG, "CloseLiveStream: cleared active stream state");
   }
 
-  PVR_ERROR IsEPGTagPlayable(const kodi::addon::PVREPGTag& tag, bool& bIsPlayable) override
-  {
-    // Check if this EPG tag can be played as catchup
-    EnsureLoaded();
-    
-    bIsPlayable = false;
-    
-    std::shared_ptr<const std::vector<xtream::LiveStream>> streams;
-    {
-      std::lock_guard<std::mutex> lock(m_mutex);
-      streams = m_streams;
-    }
-    
-    if (!streams)
-      return PVR_ERROR_NO_ERROR;
-    
-    const unsigned int channelUid = tag.GetUniqueChannelId();
-    const time_t startTime = tag.GetStartTime();
-    const time_t endTime = tag.GetEndTime();
-    const time_t now = std::time(nullptr);
-    
-    // Find the channel and check if it supports catchup
-    for (const auto& stream : *streams)
-    {
-      if (static_cast<unsigned int>(stream.id) == channelUid)
-      {
-        // Check if channel has catchup/archive support
-        if (!stream.tvArchive || stream.tvArchiveDuration <= 0)
-        {
-          bIsPlayable = false;
-          return PVR_ERROR_NO_ERROR;
-        }
-        
-        // Programme must have started (can't play future programmes)
-        if (startTime > now)
-        {
-          bIsPlayable = false;
-          return PVR_ERROR_NO_ERROR;
-        }
-        
-        // Programme start must be within the catchup window
-        const time_t catchupWindowSeconds = stream.tvArchiveDuration * 3600;
-        if (startTime < (now - catchupWindowSeconds))
-        {
-          bIsPlayable = false;
-          return PVR_ERROR_NO_ERROR;
-        }
-        
-        // All checks passed - this EPG tag is playable
-        bIsPlayable = true;
-        return PVR_ERROR_NO_ERROR;
-      }
-    }
-    
-    return PVR_ERROR_NO_ERROR;
-  }
-
   PVR_ERROR GetEPGTagStreamProperties(const kodi::addon::PVREPGTag& tag,
                                      std::vector<kodi::addon::PVRStreamProperty>& properties) override
   {
