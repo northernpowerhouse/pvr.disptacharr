@@ -388,6 +388,9 @@ public:
 
     // EPG support via XMLTV from Xtream Codes server
     capabilities.SetSupportsEPG(true);
+    
+    // Support for playing past EPG programs (catchup)
+    capabilities.SetSupportsEPGTagPlayback(true);
 
     // We provide stream URLs and let Kodi handle playback.
     capabilities.SetHandlesInputStream(false);
@@ -1017,7 +1020,8 @@ public:
     std::shared_ptr<const std::vector<xtream::LiveStream>> streams;
     xtream::Settings settings;
     std::string streamFormat;
-    std::string pendingCatchupUrl;
+    PendingCatchup pendingCatchup;
+    bool hasPendingCatchup = false;
     {
       std::lock_guard<std::mutex> lock(m_mutex);
       uidToStream = m_uidToStreamId;
@@ -1033,7 +1037,8 @@ public:
       {
         if (pendingIt->second.expiresAtMs >= nowMs && !pendingIt->second.url.empty())
         {
-          pendingCatchupUrl = pendingIt->second.url;
+          pendingCatchup = pendingIt->second;
+          hasPendingCatchup = true;
           // Store as active catchup for GetStreamTimes/CanSeekStream/IsRealTimeStream
           m_activeCatchup = pendingIt->second;
           m_activeCatchupChannelUid = channelUid;
@@ -1056,10 +1061,27 @@ public:
                                         : "video/mp2t";
 
     // If we have a pending catchup URL from GetEPGTagStreamProperties, use it
-    if (!pendingCatchupUrl.empty())
+    if (hasPendingCatchup)
     {
-      kodi::Log(ADDON_LOG_INFO, "GetChannelStreamProperties: using CATCHUP URL = %s", pendingCatchupUrl.c_str());
-      properties.emplace_back(PVR_STREAM_PROPERTY_STREAMURL, pendingCatchupUrl);
+      kodi::Log(ADDON_LOG_INFO, "GetChannelStreamProperties: using CATCHUP URL = %s", pendingCatchup.url.c_str());
+      
+      if (pendingCatchup.useFFmpegDirect && !pendingCatchup.templateUrl.empty())
+      {
+        // Use inputstream.ffmpegdirect with catchup mode for seeking support
+        properties.emplace_back(PVR_STREAM_PROPERTY_INPUTSTREAM, "inputstream.ffmpegdirect");
+        properties.emplace_back("inputstream-player", "videodefaultplayer");
+        properties.emplace_back("inputstream.ffmpegdirect.stream_mode", "catchup");
+        properties.emplace_back("inputstream.ffmpegdirect.default_url", pendingCatchup.url);
+        properties.emplace_back("inputstream.ffmpegdirect.catchup_url_format_string", pendingCatchup.templateUrl);
+        properties.emplace_back("inputstream.ffmpegdirect.catchup_buffer_start_time", std::to_string(pendingCatchup.adjustedStart));
+        properties.emplace_back("inputstream.ffmpegdirect.catchup_buffer_end_time", std::to_string(pendingCatchup.programEnd));
+        properties.emplace_back("inputstream.ffmpegdirect.catchup_terminates", "true");
+        properties.emplace_back("inputstream.ffmpegdirect.is_realtime_stream", "false");
+        properties.emplace_back("inputstream.ffmpegdirect.timezone_shift", "0");
+        kodi::Log(ADDON_LOG_INFO, "GetChannelStreamProperties: using inputstream.ffmpegdirect catchup mode");
+      }
+      
+      properties.emplace_back(PVR_STREAM_PROPERTY_STREAMURL, pendingCatchup.url);
       properties.emplace_back(PVR_STREAM_PROPERTY_ISREALTIMESTREAM, "false");
       properties.emplace_back(PVR_STREAM_PROPERTY_EPGPLAYBACKASLIVE, "false");
       properties.emplace_back(PVR_STREAM_PROPERTY_MIMETYPE, streamMimeType);
@@ -1341,13 +1363,8 @@ public:
 
         // Store the catchup URL for GetChannelStreamProperties to use
         // Kodi will call GetChannelStreamProperties after this, and we need to provide the catchup URL there
-        {
-          const auto now = std::chrono::steady_clock::now();
-          const int64_t nowMs = std::chrono::duration_cast<std::chrono::milliseconds>(now.time_since_epoch()).count();
-          std::lock_guard<std::mutex> lock(m_mutex);
-          m_pendingCatchupByChannel[channelUid] = PendingCatchup{url, nowMs + 30000, startTime, endTime};
-        }
-        kodi::Log(ADDON_LOG_INFO, "GetEPGTagStreamProperties: stored catchup URL for channel %u", channelUid);
+        const auto now = std::chrono::steady_clock::now();
+        const int64_t nowMs = std::chrono::duration_cast<std::chrono::milliseconds>(now.time_since_epoch()).count();
         
         const std::string streamMimeType = (ToLower(streamFormat) == "hls")
                     ? "application/vnd.apple.mpegurl"
@@ -1379,6 +1396,14 @@ public:
           
           kodi::Log(ADDON_LOG_INFO, "GetEPGTagStreamProperties: catchup URL template = %s", templateUrl.c_str());
           
+          // Store all the info needed for GetChannelStreamProperties to set up ffmpegdirect
+          {
+            std::lock_guard<std::mutex> lock(m_mutex);
+            m_pendingCatchupByChannel[channelUid] = PendingCatchup{
+              url, templateUrl, nowMs + 30000, startTime, effectiveEnd, adjustedStartTime, true
+            };
+          }
+          
           properties.emplace_back(PVR_STREAM_PROPERTY_INPUTSTREAM, "inputstream.ffmpegdirect");
           // Force VideoPlayer to be used (required for proper PVR channel handling)
           properties.emplace_back("inputstream-player", "videodefaultplayer");
@@ -1404,8 +1429,16 @@ public:
         }
         else
         {
+          // Store basic catchup info without ffmpegdirect
+          {
+            std::lock_guard<std::mutex> lock(m_mutex);
+            m_pendingCatchupByChannel[channelUid] = PendingCatchup{
+              url, "", nowMs + 30000, startTime, effectiveEnd, startTime, false
+            };
+          }
           properties.emplace_back(PVR_STREAM_PROPERTY_STREAMURL, url);
         }
+        kodi::Log(ADDON_LOG_INFO, "GetEPGTagStreamProperties: stored catchup URL for channel %u", channelUid);
         kodi::Log(ADDON_LOG_INFO, "GetEPGTagStreamProperties: added STREAMURL property");
         properties.emplace_back(PVR_STREAM_PROPERTY_ISREALTIMESTREAM, "false");
         properties.emplace_back(PVR_STREAM_PROPERTY_EPGPLAYBACKASLIVE, "false");
@@ -2274,9 +2307,12 @@ private:
   struct PendingCatchup
   {
     std::string url;
+    std::string templateUrl;  // For ffmpegdirect catchup mode
     int64_t expiresAtMs = 0;
     time_t programStart = 0;
     time_t programEnd = 0;
+    time_t adjustedStart = 0;  // Start time adjusted for catchup offset
+    bool useFFmpegDirect = false;
   };
   std::unordered_map<unsigned int, PendingCatchup> m_pendingCatchupByChannel;
   
