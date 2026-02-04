@@ -1098,55 +1098,25 @@ public:
       
       properties.emplace_back(PVR_STREAM_PROPERTY_INPUTSTREAM, "inputstream.ffmpegdirect");
       
-      // If channel has catchup support, provide catchup template for backward seeking
+      // For live streams, use timeshift mode (not catchup mode).
+      // Timeshift mode allows pausing and seeking back in the live buffer.
+      // Catchup mode is only for EPG tag playback where we want to play a specific past programme.
+      // Using catchup mode for live streams causes immediate EOF because ffmpegdirect expects
+      // to seek to a specific position in a finite buffer, but live streams have no data buffered yet.
       if (channelStream && channelStream->tvArchive && channelStream->tvArchiveDuration > 0)
       {
-        // Calculate catchup offset
-        int offsetHours = settings.catchupStartOffsetHours;
-        if (offsetHours < 0)
-          offsetHours = 0;
-        const time_t nowTs = std::time(nullptr);
-        const time_t offsetSeconds = offsetHours * 3600;
-        const time_t archiveStart = nowTs - (channelStream->tvArchiveDuration * 3600) + offsetSeconds;
-        const time_t archiveEnd = nowTs;
-        
-        // Calculate duration for catchup window
-        const int archiveDurationMinutes = static_cast<int>((archiveEnd - archiveStart) / 60);
-        
-        // Build catchup URL template for seeking backwards
-        const std::string catchupTemplate = xtream::BuildCatchupUrlTemplate(
-            settings, streamId, archiveDurationMinutes, streamFormat);
-        
-        if (!catchupTemplate.empty())
-        {
-          properties.emplace_back("inputstream.ffmpegdirect.stream_mode", "catchup");
-          properties.emplace_back("inputstream.ffmpegdirect.default_url", url);
-          properties.emplace_back("inputstream.ffmpegdirect.catchup_url_format_string", catchupTemplate);
-          properties.emplace_back("inputstream.ffmpegdirect.catchup_buffer_start_time", std::to_string(archiveStart));
-          properties.emplace_back("inputstream.ffmpegdirect.catchup_buffer_end_time", std::to_string(archiveEnd));
-          
-          // For live streams, we must NOT terminate at the buffer end time, as the stream continues.
-          // Setting this to true causes crashes/EOF behavior when the live edge is reached.
-          properties.emplace_back("inputstream.ffmpegdirect.catchup_terminates", "false");
-          // Explicitly state this is a realtime stream to prevent ffmpegdirect from treating it as finite
-          properties.emplace_back("inputstream.ffmpegdirect.is_realtime_stream", "true");
-          
-          properties.emplace_back("inputstream.ffmpegdirect.timezone_shift", "0");
-          kodi::Log(ADDON_LOG_INFO, "GetChannelStreamProperties: using live stream with catchup mode for backward seeking beyond buffer");
-        }
-        else
-        {
-          properties.emplace_back("inputstream.ffmpegdirect.stream_mode", "default");
-          properties.emplace_back("inputstream.ffmpegdirect.is_realtime_stream", "true");
-          kodi::Log(ADDON_LOG_INFO, "GetChannelStreamProperties: using live stream without catchup (template empty)");
-        }
+        // Channel has catchup/timeshift support - use timeshift mode for live playback
+        properties.emplace_back("inputstream.ffmpegdirect.stream_mode", "timeshift");
+        properties.emplace_back("inputstream.ffmpegdirect.is_realtime_stream", "true");
+        kodi::Log(ADDON_LOG_INFO, "GetChannelStreamProperties: using timeshift mode (channel has %d hours catchup)",
+                  channelStream->tvArchiveDuration);
       }
       else
       {
         // No catchup support, use default live mode
         properties.emplace_back("inputstream.ffmpegdirect.stream_mode", "default");
         properties.emplace_back("inputstream.ffmpegdirect.is_realtime_stream", "true");
-        kodi::Log(ADDON_LOG_INFO, "GetChannelStreamProperties: using live stream without catchup support");
+        kodi::Log(ADDON_LOG_INFO, "GetChannelStreamProperties: using default mode (no catchup support)");
       }
     }
     
