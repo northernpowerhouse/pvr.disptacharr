@@ -1097,25 +1097,35 @@ public:
       }
       
       properties.emplace_back(PVR_STREAM_PROPERTY_INPUTSTREAM, "inputstream.ffmpegdirect");
+      // Force VideoPlayer to be used (required for proper PVR channel handling)
+      properties.emplace_back("inputstream-player", "videodefaultplayer");
       
       // For live streams, use timeshift mode (not catchup mode).
       // Timeshift mode allows pausing and seeking back in the live buffer.
       // Catchup mode is only for EPG tag playback where we want to play a specific past programme.
       // Using catchup mode for live streams causes immediate EOF because ffmpegdirect expects
       // to seek to a specific position in a finite buffer, but live streams have no data buffered yet.
+      //
+      // IMPORTANT: We set is_realtime_stream=false to force ffmpegdirect to call 
+      // avformat_find_stream_info() and detect streams upfront. When is_realtime_stream=true,
+      // ffmpegdirect skips stream probing and defers detection to DemuxRead(), but Kodi's
+      // VideoPlayer calls GetStreamIds() immediately after open, before any DemuxRead() happens.
+      // This causes channel switching to fail because the new stream has no detected streams yet.
       if (channelStream && channelStream->tvArchive && channelStream->tvArchiveDuration > 0)
       {
         // Channel has catchup/timeshift support - use timeshift mode for live playback
         properties.emplace_back("inputstream.ffmpegdirect.stream_mode", "timeshift");
-        properties.emplace_back("inputstream.ffmpegdirect.is_realtime_stream", "true");
+        // Set to false to force stream probing - required for channel switching to work
+        properties.emplace_back("inputstream.ffmpegdirect.is_realtime_stream", "false");
         kodi::Log(ADDON_LOG_INFO, "GetChannelStreamProperties: using timeshift mode (channel has %d hours catchup)",
                   channelStream->tvArchiveDuration);
       }
       else
       {
-        // No catchup support, use default live mode
+        // No catchup support, use default live mode  
         properties.emplace_back("inputstream.ffmpegdirect.stream_mode", "default");
-        properties.emplace_back("inputstream.ffmpegdirect.is_realtime_stream", "true");
+        // Set to false to force stream probing - required for channel switching to work
+        properties.emplace_back("inputstream.ffmpegdirect.is_realtime_stream", "false");
         kodi::Log(ADDON_LOG_INFO, "GetChannelStreamProperties: using default mode (no catchup support)");
       }
     }
@@ -1409,6 +1419,8 @@ public:
           kodi::Log(ADDON_LOG_INFO, "GetEPGTagStreamProperties: catchup URL template = %s", templateUrl.c_str());
           
           properties.emplace_back(PVR_STREAM_PROPERTY_INPUTSTREAM, "inputstream.ffmpegdirect");
+          // Force VideoPlayer to be used (required for proper PVR channel handling)
+          properties.emplace_back("inputstream-player", "videodefaultplayer");
           // Use catchup mode with URL template - ffmpegdirect substitutes placeholders when seeking
           properties.emplace_back("inputstream.ffmpegdirect.stream_mode", "catchup");
           // The default URL is used for initial playback (concrete URL with actual start time)
