@@ -1079,56 +1079,17 @@ public:
 
     kodi::Log(ADDON_LOG_DEBUG, "GetChannelStreamProperties: using LIVE URL = %s", url.c_str());
     
-    // Optionally use inputstream.ffmpegdirect for live streams
-    if (settings.useFFmpegDirect)
-    {
-      // Check if this channel has catchup support for backward seeking
-      const xtream::LiveStream* channelStream = nullptr;
-      if (streams)
-      {
-        for (const auto& stream : *streams)
-        {
-          if (stream.id == streamId)
-          {
-            channelStream = &stream;
-            break;
-          }
-        }
-      }
-      
-      properties.emplace_back(PVR_STREAM_PROPERTY_INPUTSTREAM, "inputstream.ffmpegdirect");
-      // Force VideoPlayer to be used (required for proper PVR channel handling)
-      properties.emplace_back("inputstream-player", "videodefaultplayer");
-      
-      // For live streams, use timeshift mode (not catchup mode).
-      // Timeshift mode allows pausing and seeking back in the live buffer.
-      // Catchup mode is only for EPG tag playback where we want to play a specific past programme.
-      // Using catchup mode for live streams causes immediate EOF because ffmpegdirect expects
-      // to seek to a specific position in a finite buffer, but live streams have no data buffered yet.
-      //
-      // IMPORTANT: We set is_realtime_stream=false to force ffmpegdirect to call 
-      // avformat_find_stream_info() and detect streams upfront. When is_realtime_stream=true,
-      // ffmpegdirect skips stream probing and defers detection to DemuxRead(), but Kodi's
-      // VideoPlayer calls GetStreamIds() immediately after open, before any DemuxRead() happens.
-      // This causes channel switching to fail because the new stream has no detected streams yet.
-      if (channelStream && channelStream->tvArchive && channelStream->tvArchiveDuration > 0)
-      {
-        // Channel has catchup/timeshift support - use timeshift mode for live playback
-        properties.emplace_back("inputstream.ffmpegdirect.stream_mode", "timeshift");
-        // Set to false to force stream probing - required for channel switching to work
-        properties.emplace_back("inputstream.ffmpegdirect.is_realtime_stream", "false");
-        kodi::Log(ADDON_LOG_INFO, "GetChannelStreamProperties: using timeshift mode (channel has %d hours catchup)",
-                  channelStream->tvArchiveDuration);
-      }
-      else
-      {
-        // No catchup support, use default live mode  
-        properties.emplace_back("inputstream.ffmpegdirect.stream_mode", "default");
-        // Set to false to force stream probing - required for channel switching to work
-        properties.emplace_back("inputstream.ffmpegdirect.is_realtime_stream", "false");
-        kodi::Log(ADDON_LOG_INFO, "GetChannelStreamProperties: using default mode (no catchup support)");
-      }
-    }
+    // For live streams, use Kodi's built-in ffmpeg inputstream.
+    // We cannot use inputstream.ffmpegdirect for channel switching because it has a bug:
+    // When m_reopen=true (which happens during transport stream reopens), ffmpegdirect
+    // skips avformat_find_stream_info() regardless of is_realtime_stream setting.
+    // This causes GetStreamIds() to return empty, breaking channel switching.
+    // 
+    // Kodi's built-in inputstream (PVR_STREAM_PROPERTY_VALUE_INPUTSTREAMFFMPEG) handles
+    // TS streams properly and supports channel switching. This is also what pvr.iptvsimple
+    // uses as a fallback for HLS/TS streams.
+    properties.emplace_back(PVR_STREAM_PROPERTY_INPUTSTREAM, PVR_STREAM_PROPERTY_VALUE_INPUTSTREAMFFMPEG);
+    kodi::Log(ADDON_LOG_INFO, "GetChannelStreamProperties: using Kodi's built-in ffmpeg inputstream");
     
     properties.emplace_back(PVR_STREAM_PROPERTY_STREAMURL, url);
     properties.emplace_back(PVR_STREAM_PROPERTY_ISREALTIMESTREAM, "true");
