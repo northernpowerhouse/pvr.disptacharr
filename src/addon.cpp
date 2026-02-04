@@ -1348,9 +1348,10 @@ public:
         }
 
         // Build catchup URL (use 'now' as end for ongoing programmes)
-        const time_t effectiveEnd = (endTime > nowTs) ? nowTs : endTime;
+        const bool isOngoing = (endTime > nowTs);
+        const time_t effectiveEnd = isOngoing ? nowTs : endTime;
         const std::string url = xtream::BuildCatchupUrl(settings, stream.id, startTime, effectiveEnd, streamFormat);
-        kodi::Log(ADDON_LOG_INFO, "GetEPGTagStreamProperties: catchup URL = %s", url.c_str());
+        kodi::Log(ADDON_LOG_INFO, "GetEPGTagStreamProperties: catchup URL = %s, isOngoing=%d", url.c_str(), isOngoing);
         
         if (url.empty())
         {
@@ -1413,10 +1414,21 @@ public:
           // Buffer boundaries in epoch seconds (adjusted for catchup offset to match the concrete URL)
           properties.emplace_back("inputstream.ffmpegdirect.catchup_buffer_start_time", std::to_string(adjustedStartTime));
           properties.emplace_back("inputstream.ffmpegdirect.catchup_buffer_end_time", std::to_string(effectiveEnd));
-          // Terminate at programme end to avoid auto-jumping to next EPG entry
-          properties.emplace_back("inputstream.ffmpegdirect.catchup_terminates", "true");
-          // Treat as non-realtime so duration is fixed
-          properties.emplace_back("inputstream.ffmpegdirect.is_realtime_stream", "false");
+          
+          // For ongoing programs: treat as realtime so the buffer grows toward live
+          // For finished programs: fixed buffer, terminate at end
+          if (isOngoing)
+          {
+            properties.emplace_back("inputstream.ffmpegdirect.catchup_terminates", "false");
+            properties.emplace_back("inputstream.ffmpegdirect.is_realtime_stream", "true");
+            kodi::Log(ADDON_LOG_INFO, "GetEPGTagStreamProperties: ongoing program - realtime mode enabled");
+          }
+          else
+          {
+            properties.emplace_back("inputstream.ffmpegdirect.catchup_terminates", "true");
+            properties.emplace_back("inputstream.ffmpegdirect.is_realtime_stream", "false");
+          }
+          
           // Timezone offset (0 = UTC, ffmpegdirect applies this to placeholder substitution)
           properties.emplace_back("inputstream.ffmpegdirect.timezone_shift", "0");
           // Use the concrete URL for initial stream open
