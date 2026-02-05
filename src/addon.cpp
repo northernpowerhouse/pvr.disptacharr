@@ -1441,8 +1441,13 @@ public:
           }
           
           // Calculate local timezone offset from UTC
-          // ffmpegdirect uses localtime() when formatting URLs, but our server expects UTC
-          // We need to pass the NEGATIVE offset so ffmpegdirect converts back to UTC
+          // ffmpegdirect formula: FormatDateTime(offset - m_timezoneShift, ...) then SafeLocaltime()
+          // - offset is the UTC epoch we want
+          // - SafeLocaltime() adds local timezone offset
+          // - So we pass POSITIVE local offset to subtract it before localtime adds it back
+          // Example for UTC+1 (offset 3600):
+          //   seekTime 23:33 UTC (epoch X) - 3600 = epoch X-3600 (22:33 UTC)
+          //   SafeLocaltime adds +1 hour = 23:33 local (which displays as 23:33) ✓
           time_t now = std::time(nullptr);
           std::tm utcTm = {};
           std::tm localTm = {};
@@ -1453,13 +1458,13 @@ public:
           gmtime_r(&now, &utcTm);
           localtime_r(&now, &localTm);
 #endif
-          // Calculate offset: local - UTC (in seconds)
+          // Calculate offset: local - UTC (positive for UTC+ timezones)
           time_t utcTime = timegm(&utcTm);
           time_t localAsUtc = timegm(&localTm);
           int timezoneOffsetSecs = static_cast<int>(localAsUtc - utcTime);
-          // Pass negative offset so ffmpegdirect adjusts from local back to UTC
-          properties.emplace_back("inputstream.ffmpegdirect.timezone_shift", std::to_string(-timezoneOffsetSecs));
-          kodi::Log(ADDON_LOG_INFO, "GetEPGTagStreamProperties: timezone_shift=%d (local offset %d)", -timezoneOffsetSecs, timezoneOffsetSecs);
+          // Pass POSITIVE offset - ffmpegdirect subtracts this before calling localtime
+          properties.emplace_back("inputstream.ffmpegdirect.timezone_shift", std::to_string(timezoneOffsetSecs));
+          kodi::Log(ADDON_LOG_INFO, "GetEPGTagStreamProperties: timezone_shift=%d (local offset from UTC)", timezoneOffsetSecs);
           
           // Use the concrete URL for initial stream open
           properties.emplace_back(PVR_STREAM_PROPERTY_STREAMURL, url);
