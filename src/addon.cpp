@@ -31,6 +31,16 @@
     return (localtime_s(buf, timer) == 0) ? buf : nullptr;
   }
   #define localtime_r localtime_r_compat
+  
+  // Windows doesn't have gmtime_r, use gmtime_s instead
+  static inline std::tm* gmtime_r_compat(const time_t* timer, std::tm* buf)
+  {
+    return (gmtime_s(buf, timer) == 0) ? buf : nullptr;
+  }
+  #define gmtime_r gmtime_r_compat
+  
+  // Windows doesn't have timegm, use _mkgmtime instead
+  #define timegm _mkgmtime
 #endif
 
 namespace
@@ -1430,8 +1440,27 @@ public:
             properties.emplace_back("inputstream.ffmpegdirect.is_realtime_stream", "false");
           }
           
-          // Timezone offset (0 = UTC, ffmpegdirect applies this to placeholder substitution)
-          properties.emplace_back("inputstream.ffmpegdirect.timezone_shift", "0");
+          // Calculate local timezone offset from UTC
+          // ffmpegdirect uses localtime() when formatting URLs, but our server expects UTC
+          // We need to pass the NEGATIVE offset so ffmpegdirect converts back to UTC
+          time_t now = std::time(nullptr);
+          std::tm utcTm = {};
+          std::tm localTm = {};
+#ifdef _WIN32
+          gmtime_s(&utcTm, &now);
+          localtime_s(&localTm, &now);
+#else
+          gmtime_r(&now, &utcTm);
+          localtime_r(&now, &localTm);
+#endif
+          // Calculate offset: local - UTC (in seconds)
+          time_t utcTime = timegm(&utcTm);
+          time_t localAsUtc = timegm(&localTm);
+          int timezoneOffsetSecs = static_cast<int>(localAsUtc - utcTime);
+          // Pass negative offset so ffmpegdirect adjusts from local back to UTC
+          properties.emplace_back("inputstream.ffmpegdirect.timezone_shift", std::to_string(-timezoneOffsetSecs));
+          kodi::Log(ADDON_LOG_INFO, "GetEPGTagStreamProperties: timezone_shift=%d (local offset %d)", -timezoneOffsetSecs, timezoneOffsetSecs);
+          
           // Use the concrete URL for initial stream open
           properties.emplace_back(PVR_STREAM_PROPERTY_STREAMURL, url);
           
