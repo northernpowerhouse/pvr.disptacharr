@@ -758,32 +758,37 @@ public:
       kodi::Log(ADDON_LOG_DEBUG, "pvr.dispatcharr: AddTimer - start=%ld, end=%ld",
                 (long)timer.GetStartTime(), (long)timer.GetEndTime());
       
-      // Look up TVG ID for the channel
-      std::string tvgId;
+      // Look up Dispatcharr's TVG ID for the channel (not Xtream's epg_channel_id)
+      std::string dispatchTvgId;
+      std::string xtreamTvgId;
       
       {
          std::lock_guard<std::mutex> lock(m_mutex);
          if (m_streams) {
              for(const auto& s : *m_streams) {
                  if (static_cast<unsigned int>(s.id) == chanUid) {
-                     tvgId = s.epgChannelId;
+                     xtreamTvgId = s.epgChannelId;
                      break;
                  }
              }
          }
       }
+      
+      // Get the actual Dispatcharr tvg_id (which may differ from Xtream's epg_channel_id)
+      dispatchTvgId = m_dispatcharrClient->GetDispatchTvgId(chanUid);
 
       if (typeId == 2) // Series
       {
-          if (tvgId.empty()) {
-              kodi::Log(ADDON_LOG_ERROR, "pvr.dispatcharr: Cannot add series rule, no TVG ID found for channel %u", chanUid);
+          if (dispatchTvgId.empty()) {
+              kodi::Log(ADDON_LOG_ERROR, "pvr.dispatcharr: Cannot add series rule, no Dispatcharr TVG ID found for Kodi channel %u (Xtream tvg_id='%s')", 
+                        chanUid, xtreamTvgId.c_str());
               return PVR_ERROR_FAILED;
           }
           std::string title = timer.GetTitle(); 
-          kodi::Log(ADDON_LOG_DEBUG, "pvr.dispatcharr: AddTimer (series) - calling Dispatcharr API POST /api/channels/series-rules/ with tvg_id='%s', title='%s', mode='new'",
-                    tvgId.c_str(), title.c_str());
+          kodi::Log(ADDON_LOG_DEBUG, "pvr.dispatcharr: AddTimer (series) - calling Dispatcharr API POST /api/channels/series-rules/ with tvg_id='%s' (Xtream had '%s'), title='%s', mode='new'",
+                    dispatchTvgId.c_str(), xtreamTvgId.c_str(), title.c_str());
           // If title is empty?
-          if (m_dispatcharrClient->AddSeriesRule(tvgId, title, "new")) {
+          if (m_dispatcharrClient->AddSeriesRule(dispatchTvgId, title, "new")) {
               kodi::Log(ADDON_LOG_DEBUG, "pvr.dispatcharr: AddTimer (series) - Dispatcharr API returned success");
               TriggerTimerUpdate();
               return PVR_ERROR_NO_ERROR;
