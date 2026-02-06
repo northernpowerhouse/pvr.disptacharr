@@ -711,6 +711,8 @@ public:
           for (const auto& r : recs) {
               // Only show scheduled or in-progress recordings in timers list
               // Completed recordings go to GetRecordings, not here
+              kodi::Log(ADDON_LOG_DEBUG, "pvr.dispatcharr: GetTimers - recording id=%d, status='%s', title='%s', channel=%d",
+                        r.id, r.status.c_str(), r.title.c_str(), r.channelId);
               if (r.status != "scheduled" && r.status != "recording") 
                   continue;
               timerCount++;
@@ -722,6 +724,8 @@ public:
               t.SetTimerType(1);
               // Map Dispatcharr channel ID back to Kodi channel UID
               int kodiUid = m_dispatcharrClient->GetKodiChannelUid(r.channelId);
+              kodi::Log(ADDON_LOG_DEBUG, "pvr.dispatcharr: GetTimers - recording id=%d mapped channel %d -> kodiUid %d",
+                        r.id, r.channelId, kodiUid);
               if (kodiUid > 0) {
                   t.SetClientChannelUid(kodiUid);
               }

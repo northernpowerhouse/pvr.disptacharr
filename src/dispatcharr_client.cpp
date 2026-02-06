@@ -684,6 +684,12 @@ bool Client::FetchRecordings(std::vector<Recording>& outRecordings)
           ExtractStringField(customProps, "poster_url", r.iconPath);
       }
       
+      // Default to "scheduled" if status is missing (e.g. newly created recordings
+      // may not have status set yet in the API response)
+      if (r.status.empty()) {
+          r.status = "scheduled";
+      }
+      
       // Stream URL
       // /api/channels/recordings/{id}/file/
       r.streamUrl = GetBaseUrl() + "/api/channels/recordings/" + std::to_string(r.id) + "/file/";
