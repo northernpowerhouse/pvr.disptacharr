@@ -103,18 +103,3 @@ msgctxt "#30402"
 msgid "Custom user agent"
 msgstr "Agente de utilizador personalizado"
 
-msgctxt "#30500"
-msgid "Recordings"
-msgstr "Gravações"
-
-msgctxt "#30501"
-msgid "Series rule mode"
-msgstr "Modo de séries"
-
-msgctxt "#30502"
-msgid "New episodes only"
-msgstr "Apenas episódios novos"
-
-msgctxt "#30503"
-msgid "All episodes"
-msgstr "Todos os episódios"

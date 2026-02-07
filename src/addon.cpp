@@ -611,7 +611,7 @@ public:
       {
           PVRTimerType t;
           t.SetId(2);
-          t.SetDescription("Series Recording");
+          t.SetDescription("Series Recording (New Episodes)");
           t.SetAttributes(
               PVR_TIMER_TYPE_IS_REPEATING |
               PVR_TIMER_TYPE_SUPPORTS_ENABLE_DISABLE |
@@ -621,6 +621,20 @@ public:
           );
           types.push_back(t);
       }
+        // Type 5: Series Recording (All Episodes)
+        {
+          PVRTimerType t;
+          t.SetId(5);
+          t.SetDescription("Series Recording (All Episodes)");
+          t.SetAttributes(
+            PVR_TIMER_TYPE_IS_REPEATING |
+            PVR_TIMER_TYPE_SUPPORTS_ENABLE_DISABLE |
+            PVR_TIMER_TYPE_SUPPORTS_CHANNELS |
+            PVR_TIMER_TYPE_SUPPORTS_TITLE_EPG_MATCH |
+            PVR_TIMER_TYPE_SUPPORTS_ANY_CHANNEL
+          );
+          types.push_back(t);
+        }
       // Type 3: Recurring Manual (manual, repeating, weekday-based)
       {
           PVRTimerType t;
@@ -673,7 +687,10 @@ public:
               // Use index offset by 10000 for series rules
               t.SetClientIndex(10000 + seriesIdx);
               t.SetTitle(s.title.empty() ? "All Shows" : s.title);
-              t.SetTimerType(2); 
+              if (ToLower(s.mode) == "all")
+                t.SetTimerType(5);
+              else
+                t.SetTimerType(2);
               t.SetSummary(std::string("Mode: ") + s.mode + " (TVG: " + s.tvgId + ")");
               t.SetState(PVR_TIMER_STATE_SCHEDULED);
               results.Add(t);
@@ -784,18 +801,14 @@ public:
                     chanUid, channelNumber, dispatchTvgId.c_str());
       }
 
-      if (typeId == 2) // Series
+      if (typeId == 2 || typeId == 5) // Series
       {
           if (dispatchTvgId.empty()) {
               kodi::Log(ADDON_LOG_ERROR, "pvr.dispatcharr: Cannot add series rule, no Dispatcharr TVG ID found for Kodi channel %u (Xtream tvg_id='%s')", 
                         chanUid, xtreamTvgId.c_str());
               return PVR_ERROR_FAILED;
           }
-          std::string seriesMode;
-          kodi::addon::GetSettingString("series_rule_mode", seriesMode);
-          seriesMode = ToLower(Trim(seriesMode));
-          if (seriesMode != "new" && seriesMode != "all")
-          seriesMode = "new";
+          std::string seriesMode = (typeId == 5) ? "all" : "new";
           std::string title = timer.GetTitle(); 
           kodi::Log(ADDON_LOG_DEBUG, "pvr.dispatcharr: AddTimer (series) - calling Dispatcharr API POST /api/channels/series-rules/ with tvg_id='%s' (Xtream had '%s'), title='%s', mode='%s'",
               dispatchTvgId.c_str(), xtreamTvgId.c_str(), title.c_str(), seriesMode.c_str());

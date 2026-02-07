@@ -169,24 +169,6 @@
       </group>
     </category>
 
-    <category id="recordings" label="30500" help="">
-      <group id="1">
-        <setting id="series_rule_mode" type="string" label="30501" help="">
-          <level>0</level>
-          <default>new</default>
-          <constraints>
-            <options>
-              <option label="30502" value="new">new</option>
-              <option label="30503" value="all">all</option>
-            </options>
-          </constraints>
-          <control type="list" format="string">
-            <heading>30501</heading>
-          </control>
-        </setting>
-      </group>
-    </category>
-
     <category id="useragent" label="30400" help="">
       <group id="1">
         <setting id="enable_user_agent_spoofing" type="boolean" label="30401" help="">
