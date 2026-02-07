@@ -120,3 +120,19 @@ msgstr "Enable play from start for ongoing programs"
 msgctxt "#30406"
 msgid "Use inputstream.ffmpegdirect for catchup (enables seeking)"
 msgstr "Use inputstream.ffmpegdirect for catchup (enables seeking)"
+
+msgctxt "#30500"
+msgid "Recordings"
+msgstr "Recordings"
+
+msgctxt "#30501"
+msgid "Series rule mode"
+msgstr "Series rule mode"
+
+msgctxt "#30502"
+msgid "New episodes only"
+msgstr "New episodes only"
+
+msgctxt "#30503"
+msgid "All episodes"
+msgstr "All episodes"

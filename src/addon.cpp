@@ -791,11 +791,16 @@ public:
                         chanUid, xtreamTvgId.c_str());
               return PVR_ERROR_FAILED;
           }
+          std::string seriesMode;
+          kodi::addon::GetSettingString("series_rule_mode", seriesMode);
+          seriesMode = ToLower(Trim(seriesMode));
+          if (seriesMode != "new" && seriesMode != "all")
+          seriesMode = "new";
           std::string title = timer.GetTitle(); 
-          kodi::Log(ADDON_LOG_DEBUG, "pvr.dispatcharr: AddTimer (series) - calling Dispatcharr API POST /api/channels/series-rules/ with tvg_id='%s' (Xtream had '%s'), title='%s', mode='new'",
-                    dispatchTvgId.c_str(), xtreamTvgId.c_str(), title.c_str());
+          kodi::Log(ADDON_LOG_DEBUG, "pvr.dispatcharr: AddTimer (series) - calling Dispatcharr API POST /api/channels/series-rules/ with tvg_id='%s' (Xtream had '%s'), title='%s', mode='%s'",
+              dispatchTvgId.c_str(), xtreamTvgId.c_str(), title.c_str(), seriesMode.c_str());
           // If title is empty?
-          if (m_dispatcharrClient->AddSeriesRule(dispatchTvgId, title, "new")) {
+          if (m_dispatcharrClient->AddSeriesRule(dispatchTvgId, title, seriesMode)) {
               kodi::Log(ADDON_LOG_DEBUG, "pvr.dispatcharr: AddTimer (series) - Dispatcharr API returned success");
               TriggerTimerUpdate();
               return PVR_ERROR_NO_ERROR;
