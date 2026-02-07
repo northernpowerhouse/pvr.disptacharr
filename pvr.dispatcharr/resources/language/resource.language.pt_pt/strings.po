@@ -102,3 +102,4 @@ msgstr "Ativar mascaramento do agente de utilizador"
 msgctxt "#30402"
 msgid "Custom user agent"
 msgstr "Agente de utilizador personalizado"
+

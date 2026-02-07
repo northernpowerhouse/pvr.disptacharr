@@ -598,6 +598,7 @@ bool Client::FetchChannels(std::vector<DispatchChannel>& outChannels)
       ExtractIntField(obj, "channel_number", ch.channelNumber);
       ExtractStringField(obj, "name", ch.name);
       ExtractStringField(obj, "uuid", ch.uuid);
+      ExtractStringField(obj, "tvg_id", ch.tvgId);
       outChannels.push_back(ch);
     }
   });
@@ -617,8 +618,9 @@ bool Client::EnsureChannelMapping()
   for (const auto& ch : channels) {
     m_channelNumberToDispatchId[ch.channelNumber] = ch.id;
     m_dispatchIdToChannelNumber[ch.id] = ch.channelNumber;
-    kodi::Log(ADDON_LOG_DEBUG, "pvr.dispatcharr: Channel mapping: number %d -> Dispatcharr ID %d", 
-              ch.channelNumber, ch.id);
+    m_kodiUidToDispatchTvgId[ch.channelNumber] = ch.tvgId;
+    kodi::Log(ADDON_LOG_DEBUG, "pvr.dispatcharr: Channel mapping: number %d -> Dispatcharr ID %d, tvg_id='%s'", 
+              ch.channelNumber, ch.id, ch.tvgId.c_str());
   }
   
   kodi::Log(ADDON_LOG_INFO, "pvr.dispatcharr: Built channel mapping with %zu channels", 
@@ -655,6 +657,19 @@ int Client::GetKodiChannelUid(int dispatchChannelId)
   return -1;
 }
 
+std::string Client::GetDispatchTvgId(int kodiChannelUid)
+{
+  if (!EnsureChannelMapping()) return "";
+  
+  auto it = m_kodiUidToDispatchTvgId.find(kodiChannelUid);
+  if (it != m_kodiUidToDispatchTvgId.end()) {
+    return it->second;
+  }
+  
+  kodi::Log(ADDON_LOG_WARNING, "pvr.dispatcharr: No Dispatcharr tvg_id found for Kodi UID %d", kodiChannelUid);
+  return "";
+}
+
 bool Client::FetchRecordings(std::vector<Recording>& outRecordings)
 {
   if (!EnsureToken()) return false;
@@ -682,6 +697,12 @@ bool Client::FetchRecordings(std::vector<Recording>& outRecordings)
           ExtractStringField(customProps, "status", r.status);
           // Extract poster_url for cover art
           ExtractStringField(customProps, "poster_url", r.iconPath);
+      }
+      
+      // Default to "scheduled" if status is missing (e.g. newly created recordings
+      // may not have status set yet in the API response)
+      if (r.status.empty()) {
+          r.status = "scheduled";
       }
       
       // Stream URL

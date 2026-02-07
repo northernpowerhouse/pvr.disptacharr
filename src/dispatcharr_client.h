@@ -62,6 +62,7 @@ struct DispatchChannel
   int channelNumber = 0; // The channel number (matches Kodi's)
   std::string name;
   std::string uuid;
+  std::string tvgId;    // Dispatcharr's tvg_id (may differ from Xtream's epg_channel_id)
 };
 
 class Client
@@ -76,6 +77,7 @@ public:
   bool FetchChannels(std::vector<DispatchChannel>& outChannels);
   int GetDispatchChannelId(int kodiChannelUid);  // Maps Kodi UID to Dispatcharr ID
   int GetKodiChannelUid(int dispatchChannelId);  // Maps Dispatcharr ID to Kodi UID
+  std::string GetDispatchTvgId(int kodiChannelUid); // Maps Kodi UID to Dispatcharr tvg_id
   
   // Series Rules (Season Pass)
   bool FetchSeriesRules(std::vector<SeriesRule>& outRules);
@@ -97,6 +99,7 @@ private:
   std::string m_accessToken;
   std::map<int, int> m_channelNumberToDispatchId;  // Maps channel number to Dispatcharr ID
   std::map<int, int> m_dispatchIdToChannelNumber;  // Maps Dispatcharr ID to channel number (Kodi UID)
+  std::map<int, std::string> m_kodiUidToDispatchTvgId; // Maps Kodi UID to Dispatcharr tvg_id
   
   // Helper for HTTP requests
   struct HttpResponse {

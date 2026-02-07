@@ -611,7 +611,7 @@ public:
       {
           PVRTimerType t;
           t.SetId(2);
-          t.SetDescription("Series Recording");
+          t.SetDescription("Series Recording (New Episodes)");
           t.SetAttributes(
               PVR_TIMER_TYPE_IS_REPEATING |
               PVR_TIMER_TYPE_SUPPORTS_ENABLE_DISABLE |
@@ -621,6 +621,20 @@ public:
           );
           types.push_back(t);
       }
+        // Type 5: Series Recording (All Episodes)
+        {
+          PVRTimerType t;
+          t.SetId(5);
+          t.SetDescription("Series Recording (All Episodes)");
+          t.SetAttributes(
+            PVR_TIMER_TYPE_IS_REPEATING |
+            PVR_TIMER_TYPE_SUPPORTS_ENABLE_DISABLE |
+            PVR_TIMER_TYPE_SUPPORTS_CHANNELS |
+            PVR_TIMER_TYPE_SUPPORTS_TITLE_EPG_MATCH |
+            PVR_TIMER_TYPE_SUPPORTS_ANY_CHANNEL
+          );
+          types.push_back(t);
+        }
       // Type 3: Recurring Manual (manual, repeating, weekday-based)
       {
           PVRTimerType t;
@@ -673,7 +687,10 @@ public:
               // Use index offset by 10000 for series rules
               t.SetClientIndex(10000 + seriesIdx);
               t.SetTitle(s.title.empty() ? "All Shows" : s.title);
-              t.SetTimerType(2); 
+              if (ToLower(s.mode) == "all")
+                t.SetTimerType(5);
+              else
+                t.SetTimerType(2);
               t.SetSummary(std::string("Mode: ") + s.mode + " (TVG: " + s.tvgId + ")");
               t.SetState(PVR_TIMER_STATE_SCHEDULED);
               results.Add(t);
@@ -711,6 +728,8 @@ public:
           for (const auto& r : recs) {
               // Only show scheduled or in-progress recordings in timers list
               // Completed recordings go to GetRecordings, not here
+              kodi::Log(ADDON_LOG_DEBUG, "pvr.dispatcharr: GetTimers - recording id=%d, status='%s', title='%s', channel=%d",
+                        r.id, r.status.c_str(), r.title.c_str(), r.channelId);
               if (r.status != "scheduled" && r.status != "recording") 
                   continue;
               timerCount++;
@@ -722,6 +741,8 @@ public:
               t.SetTimerType(1);
               // Map Dispatcharr channel ID back to Kodi channel UID
               int kodiUid = m_dispatcharrClient->GetKodiChannelUid(r.channelId);
+              kodi::Log(ADDON_LOG_DEBUG, "pvr.dispatcharr: GetTimers - recording id=%d mapped channel %d -> kodiUid %d",
+                        r.id, r.channelId, kodiUid);
               if (kodiUid > 0) {
                   t.SetClientChannelUid(kodiUid);
               }
@@ -754,32 +775,45 @@ public:
       kodi::Log(ADDON_LOG_DEBUG, "pvr.dispatcharr: AddTimer - start=%ld, end=%ld",
                 (long)timer.GetStartTime(), (long)timer.GetEndTime());
       
-      // Look up TVG ID for the channel
-      std::string tvgId;
+      // Look up Dispatcharr's TVG ID for the channel (not Xtream's epg_channel_id)
+      std::string dispatchTvgId;
+      std::string xtreamTvgId;
+      int channelNumber = 0;
       
       {
          std::lock_guard<std::mutex> lock(m_mutex);
          if (m_streams) {
              for(const auto& s : *m_streams) {
                  if (static_cast<unsigned int>(s.id) == chanUid) {
-                     tvgId = s.epgChannelId;
+                     xtreamTvgId = s.epgChannelId;
+                     channelNumber = s.number;  // Use the channel number from Xtream stream
                      break;
                  }
              }
          }
       }
+      
+      // Get the actual Dispatcharr tvg_id using the channel number (not the Kodi UID/stream_id)
+      // Kodi UID is the Xtream stream_id, but Dispatcharr uses channel_number for mapping
+      if (channelNumber > 0) {
+          dispatchTvgId = m_dispatcharrClient->GetDispatchTvgId(channelNumber);
+          kodi::Log(ADDON_LOG_DEBUG, "pvr.dispatcharr: Mapped Kodi UID %u -> channel_number %d -> Dispatcharr tvg_id '%s'",
+                    chanUid, channelNumber, dispatchTvgId.c_str());
+      }
 
-      if (typeId == 2) // Series
+      if (typeId == 2 || typeId == 5) // Series
       {
-          if (tvgId.empty()) {
-              kodi::Log(ADDON_LOG_ERROR, "pvr.dispatcharr: Cannot add series rule, no TVG ID found for channel %u", chanUid);
+          if (dispatchTvgId.empty()) {
+              kodi::Log(ADDON_LOG_ERROR, "pvr.dispatcharr: Cannot add series rule, no Dispatcharr TVG ID found for Kodi channel %u (Xtream tvg_id='%s')", 
+                        chanUid, xtreamTvgId.c_str());
               return PVR_ERROR_FAILED;
           }
+          std::string seriesMode = (typeId == 5) ? "all" : "new";
           std::string title = timer.GetTitle(); 
-          kodi::Log(ADDON_LOG_DEBUG, "pvr.dispatcharr: AddTimer (series) - calling Dispatcharr API POST /api/channels/series-rules/ with tvg_id='%s', title='%s', mode='new'",
-                    tvgId.c_str(), title.c_str());
+          kodi::Log(ADDON_LOG_DEBUG, "pvr.dispatcharr: AddTimer (series) - calling Dispatcharr API POST /api/channels/series-rules/ with tvg_id='%s' (Xtream had '%s'), title='%s', mode='%s'",
+              dispatchTvgId.c_str(), xtreamTvgId.c_str(), title.c_str(), seriesMode.c_str());
           // If title is empty?
-          if (m_dispatcharrClient->AddSeriesRule(tvgId, title, "new")) {
+          if (m_dispatcharrClient->AddSeriesRule(dispatchTvgId, title, seriesMode)) {
               kodi::Log(ADDON_LOG_DEBUG, "pvr.dispatcharr: AddTimer (series) - Dispatcharr API returned success");
               TriggerTimerUpdate();
               return PVR_ERROR_NO_ERROR;
@@ -789,10 +823,14 @@ public:
       }
       else if (typeId == 3) // Recurring
       {
-          // Map Kodi channel UID to Dispatcharr channel ID
-          int dispatchChannelId = m_dispatcharrClient->GetDispatchChannelId(static_cast<int>(chanUid));
+          // Map channel number to Dispatcharr channel ID
+          if (channelNumber == 0) {
+              kodi::Log(ADDON_LOG_ERROR, "pvr.dispatcharr: Cannot add recurring rule, no channel number found for Kodi UID %u", chanUid);
+              return PVR_ERROR_FAILED;
+          }
+          int dispatchChannelId = m_dispatcharrClient->GetDispatchChannelId(channelNumber);
           if (dispatchChannelId < 0) {
-              kodi::Log(ADDON_LOG_ERROR, "pvr.dispatcharr: Cannot add recurring rule, no Dispatcharr channel found for Kodi UID %u", chanUid);
+              kodi::Log(ADDON_LOG_ERROR, "pvr.dispatcharr: Cannot add recurring rule, no Dispatcharr channel found for channel number %d", channelNumber);
               return PVR_ERROR_FAILED;
           }
           
@@ -837,10 +875,14 @@ public:
       }
       else // One-shot (Type 1 manual, Type 4 EPG-based, or default)
       {
-          // Map Kodi channel UID to Dispatcharr channel ID
-          int dispatchChannelId = m_dispatcharrClient->GetDispatchChannelId(static_cast<int>(chanUid));
+          // Map channel number to Dispatcharr channel ID
+          if (channelNumber == 0) {
+              kodi::Log(ADDON_LOG_ERROR, "pvr.dispatcharr: Cannot schedule recording, no channel number found for Kodi UID %u", chanUid);
+              return PVR_ERROR_FAILED;
+          }
+          int dispatchChannelId = m_dispatcharrClient->GetDispatchChannelId(channelNumber);
           if (dispatchChannelId < 0) {
-              kodi::Log(ADDON_LOG_ERROR, "pvr.dispatcharr: Cannot schedule recording, no Dispatcharr channel found for Kodi UID %u", chanUid);
+              kodi::Log(ADDON_LOG_ERROR, "pvr.dispatcharr: Cannot schedule recording, no Dispatcharr channel found for channel number %d", channelNumber);
               return PVR_ERROR_FAILED;
           }
           
