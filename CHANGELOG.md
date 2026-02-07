@@ -1,5 +1,15 @@
 # Changelog
 
+## v1.3 - 2026-02-07
+
+- Fix: Channel switching crashes have been resolved
+- Fix: Recording setting issues have been corrected
+- Enhancement: Improved stability and reliability
+
+Included commits:
+
+(See commit history for full details.)
+
 ## v1.2.3 - 2026-01-31
 
 - Fix: Ensure PVR client handles authentication failures more clearly in logs.
