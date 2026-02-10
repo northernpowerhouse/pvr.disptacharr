@@ -1291,7 +1291,7 @@ public:
         if (stream.tvArchive && stream.tvArchiveDuration > 0)
         {
           // Check if the program is within the archive window
-          const time_t archiveCutoff = now - (stream.tvArchiveDuration * 3600); // duration is in hours
+          const time_t archiveCutoff = now - (stream.tvArchiveDuration * 24 * 3600); // duration is in days
           if (endTime >= archiveCutoff)
           {
             isPlayable = true;

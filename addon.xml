@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<addon id="pvr.dispatcharr" version="1.2.3" name="Dispatcharr PVR Client" provider-name="northernpowerhouse">
+<addon id="pvr.dispatcharr" version="1.3" name="Dispatcharr PVR Client" provider-name="northernpowerhouse">
   <requires>
     <import addon="kodi.binary.instance.pvr" version="8.2.0"/>
   </requires>
@@ -22,6 +22,6 @@
       <fanart>fanart.png</fanart>
       <logo>logo.png</logo>
     </assets>
-    <news>First Release</news>
+    <news>v1.3: Fixed channel switching crashes and recording setting issues</news>
   </extension>
 </addon>
