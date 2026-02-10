@@ -47,7 +47,7 @@ struct LiveStream
   
   // Catchup/Archive support
   bool tvArchive = false;
-  int tvArchiveDuration = 0; // Duration in hours
+  int tvArchiveDuration = 0; // Duration in days
 };
 
 struct EpgEntry
