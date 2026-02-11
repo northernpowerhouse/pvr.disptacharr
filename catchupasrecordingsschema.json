@@ -1,0 +1,126 @@
+{
+  "title": "Catchup Recordings Field Map",
+  "description": "Recommended fields to expose catchup programs as PVR recordings, including a directory marker for catchup-derived items.",
+  "fields": [
+    {
+      "field": "recordingid",
+      "purpose": "Unique identifier",
+      "source": "Derived from channeluid + starttime + endtime",
+      "notes": "Stable, deterministic; hash or string key."
+    },
+    {
+      "field": "title",
+      "purpose": "Display title",
+      "source": "EPG event title",
+      "notes": "Primary label in lists/widgets."
+    },
+    {
+      "field": "starttime",
+      "purpose": "Broadcast start",
+      "source": "EPG event start time",
+      "notes": "Required for time-based filters."
+    },
+    {
+      "field": "endtime",
+      "purpose": "Broadcast end",
+      "source": "EPG event end time",
+      "notes": "Required for duration and sorting."
+    },
+    {
+      "field": "runtime",
+      "purpose": "Duration",
+      "source": "endtime - starttime",
+      "notes": "Optional but useful."
+    },
+    {
+      "field": "channel",
+      "purpose": "Channel name",
+      "source": "PVR channel name",
+      "notes": "For display and filtering."
+    },
+    {
+      "field": "channeluid",
+      "purpose": "Channel identity",
+      "source": "PVR channel unique id",
+      "notes": "Critical for cross-referencing channels."
+    },
+    {
+      "field": "epgeventid",
+      "purpose": "Link to EPG",
+      "source": "EPG event id",
+      "notes": "Enables lookups or direct play."
+    },
+    {
+      "field": "plot",
+      "purpose": "Description",
+      "source": "EPG plot/description",
+      "notes": "Nice UI detail."
+    },
+    {
+      "field": "plotoutline",
+      "purpose": "Short description",
+      "source": "EPG short plot",
+      "notes": "Optional summary."
+    },
+    {
+      "field": "genre",
+      "purpose": "Category",
+      "source": "EPG genre",
+      "notes": "Useful for filtering."
+    },
+    {
+      "field": "icon",
+      "purpose": "Icon",
+      "source": "Channel icon or EPG thumbnail",
+      "notes": "Fallback to channel icon."
+    },
+    {
+      "field": "art",
+      "purpose": "Artwork",
+      "source": "EPG thumbnail / channel artwork",
+      "notes": "For poster/thumb display."
+    },
+    {
+      "field": "streamurl",
+      "purpose": "Playback URL",
+      "source": "Catchup URL from PVR client",
+      "notes": "If present, allows direct playback."
+    },
+    {
+      "field": "file",
+      "purpose": "Playback path",
+      "source": "Optional alias to streamurl",
+      "notes": "Some skins use file."
+    },
+    {
+      "field": "directory",
+      "purpose": "Catchup marker + grouping",
+      "source": "Set to Catchup/<Channel>",
+      "notes": "Recommended discriminator for catchup-derived recordings."
+    },
+    {
+      "field": "season",
+      "purpose": "Series metadata",
+      "source": "EPG season number",
+      "notes": "If provided by EPG."
+    },
+    {
+      "field": "episode",
+      "purpose": "Series metadata",
+      "source": "EPG episode number",
+      "notes": "If provided by EPG."
+    },
+    {
+      "field": "showtitle",
+      "purpose": "Series title",
+      "source": "EPG show title",
+      "notes": "If provided by EPG."
+    },
+    {
+      "field": "radio",
+      "purpose": "Media type",
+      "source": "PVR channel type",
+      "notes": "true for radio."
+    }
+  ]
+}

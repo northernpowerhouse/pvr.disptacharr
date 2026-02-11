@@ -103,3 +103,7 @@ msgctxt "#30402"
 msgid "Custom user agent"
 msgstr "Agente de utilizador personalizado"
 
+msgctxt "#30407"
+msgid "Show catchup programs as recordings"
+msgstr "Mostrar programas catchup como gravações"
+

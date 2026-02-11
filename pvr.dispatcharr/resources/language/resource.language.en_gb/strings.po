@@ -121,3 +121,7 @@ msgctxt "#30406"
 msgid "Use inputstream.ffmpegdirect for catchup (enables seeking)"
 msgstr "Use inputstream.ffmpegdirect for catchup (enables seeking)"
 
+msgctxt "#30407"
+msgid "Show catchup programs as recordings"
+msgstr "Show catchup programs as recordings"
+

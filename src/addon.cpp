@@ -8,6 +8,7 @@
 #include <chrono>
 #include <cctype>
 #include <cstdint>
+#include <cstdlib>
 #include <condition_variable>
 #include <cstdio>
 #include <filesystem>
@@ -123,6 +124,47 @@ std::string TranslateSpecial(const std::string& url)
 }
 
 constexpr uint32_t kCacheMagic = 0x31435458; // 'XTC1' little-endian
+
+// ---- Catchup-as-recordings helpers ----
+std::string BuildCatchupRecordingId(unsigned int channelUid, time_t start, time_t end)
+{
+  return "catchup:" + std::to_string(channelUid) + ":" +
+         std::to_string(static_cast<long long>(start)) + ":" +
+         std::to_string(static_cast<long long>(end));
+}
+
+bool ParseCatchupRecordingId(const std::string& id,
+                             unsigned int& channelUid,
+                             time_t& startTime,
+                             time_t& endTime)
+{
+  // Format: catchup:<channelUid>:<startEpoch>:<endEpoch>
+  if (id.rfind("catchup:", 0) != 0)
+    return false;
+
+  const char* p = id.c_str() + 8; // skip "catchup:"
+  char* next = nullptr;
+
+  unsigned long long uid = std::strtoull(p, &next, 10);
+  if (!next || *next != ':')
+    return false;
+  p = next + 1;
+
+  long long s = std::strtoll(p, &next, 10);
+  if (!next || *next != ':')
+    return false;
+  p = next + 1;
+
+  long long e = std::strtoll(p, &next, 10);
+  if (!next || *next != '\0')
+    return false;
+
+  channelUid = static_cast<unsigned int>(uid);
+  startTime = static_cast<time_t>(s);
+  endTime = static_cast<time_t>(e);
+  return true;
+}
+// ---- End catchup-as-recordings helpers ----
 
 void AppendU32(std::string& out, uint32_t v)
 {
@@ -492,59 +534,171 @@ public:
     if (deleted)
       return PVR_ERROR_NO_ERROR;
 
-    if (!m_dispatcharrClient)
-      return PVR_ERROR_SERVER_ERROR;
+    EnsureLoaded();
 
-    std::vector<dispatcharr::Recording> recordings;
-    if (!m_dispatcharrClient->FetchRecordings(recordings))
+    // ---- Dispatcharr server recordings ----
+    if (m_dispatcharrClient)
     {
-       // If fetch fails (e.g. auth error, or server not supporting it), 
-       // just log and return OK with empty list to avoiding nagging user?
-       // Or return SERVER_ERROR.
-       kodi::Log(ADDON_LOG_ERROR, "pvr.dispatcharr: Failed to fetch recordings");
-       return PVR_ERROR_SERVER_ERROR;
+      std::vector<dispatcharr::Recording> recordings;
+      if (!m_dispatcharrClient->FetchRecordings(recordings))
+      {
+         kodi::Log(ADDON_LOG_ERROR, "pvr.dispatcharr: Failed to fetch recordings");
+         // Don't return error here — catchup pseudo-recordings may still be available
+      }
+      else
+      {
+        for (const auto& r : recordings)
+        {
+           if (r.status != "completed" && r.status != "interrupted") 
+             continue;
+
+           kodi::addon::PVRRecording rec;
+           rec.SetRecordingId(std::to_string(r.id));
+           rec.SetTitle(r.title.empty() ? "Unknown Recording" : r.title);
+           rec.SetPlot(r.plot);
+           rec.SetRecordingTime(r.startTime);
+           int duration = static_cast<int>(r.endTime - r.startTime);
+           rec.SetDuration(duration > 0 ? duration : 0);
+           rec.SetChannelUid(static_cast<int>(r.channelId));
+           if (!r.iconPath.empty()) {
+               rec.SetIconPath(r.iconPath);
+               rec.SetThumbnailPath(r.iconPath);
+               rec.SetFanartPath(r.iconPath);
+           } 
+           
+           results.Add(rec);
+        }
+      }
     }
 
-    // Filter out future recordings?
-    // Dispatcharr "recordings" endpoint returns ALL (past and future/scheduled).
-    // Kodi `GetRecordings` expects completed or in-progress recordings. 
-    // Future ones should go to `GetTimers`.
-    // We filter by status: only show "completed" or "recording" (in-progress)
-    // "scheduled" recordings go to the timers list, not recordings list.
-
-    for (const auto& r : recordings)
+    // ---- Catchup pseudo-recordings ----
     {
-       // Only show completed recordings in the recordings list
-       // In-progress ("recording") might work but file may be incomplete
-       if (r.status != "completed" && r.status != "interrupted") 
-         continue;
+      bool showCatchup = false;
+      std::shared_ptr<const std::vector<xtream::ChannelEpg>> epgData;
+      std::shared_ptr<const std::vector<xtream::LiveStream>> streams;
+      xtream::Settings settings;
+      {
+        std::lock_guard<std::mutex> lock(m_mutex);
+        settings = m_xtreamSettings;
+        showCatchup = settings.showCatchupRecordings;
+        epgData = m_epgData;
+        streams = m_streams;
+      }
 
-       kodi::addon::PVRRecording rec;
-       rec.SetRecordingId(std::to_string(r.id));
-       rec.SetTitle(r.title.empty() ? "Unknown Recording" : r.title);
-       rec.SetPlot(r.plot);
-       rec.SetRecordingTime(r.startTime);
-       int duration = static_cast<int>(r.endTime - r.startTime);
-       rec.SetDuration(duration > 0 ? duration : 0);
-       // Stream URL is provided via GetRecordingStreamProperties
-       rec.SetChannelUid(static_cast<int>(r.channelId));
-       // Set poster image if available
-       if (!r.iconPath.empty()) {
-           rec.SetIconPath(r.iconPath);
-           rec.SetThumbnailPath(r.iconPath);
-           rec.SetFanartPath(r.iconPath);
-       } 
-       
-       results.Add(rec);
+      if (showCatchup && epgData && streams)
+      {
+        const time_t now = std::time(nullptr);
+        constexpr size_t kMaxCatchupRecordings = 5000;
+        size_t catchupCount = 0;
+
+        // Build a quick lookup: stream id -> LiveStream
+        std::unordered_map<int, const xtream::LiveStream*> streamById;
+        for (const auto& st : *streams)
+          streamById[st.id] = &st;
+
+        for (const auto& chEpg : *epgData)
+        {
+          // Find matching stream by channel ID
+          const xtream::LiveStream* matchedStream = nullptr;
+          for (const auto& st : *streams)
+          {
+            if (std::to_string(st.id) == chEpg.id || st.epgChannelId == chEpg.id)
+            {
+              matchedStream = &st;
+              break;
+            }
+          }
+          if (!matchedStream)
+            continue;
+
+          // Channel must support catchup
+          if (!matchedStream->tvArchive || matchedStream->tvArchiveDuration <= 0)
+            continue;
+
+          const time_t archiveWindowStart =
+              now - static_cast<time_t>(matchedStream->tvArchiveDuration) * 86400;
+
+          for (const auto& [startKey, entry] : chEpg.entries)
+          {
+            if (catchupCount >= kMaxCatchupRecordings)
+              break;
+
+            // Must have ended (or be ongoing with play-from-start enabled)
+            if (entry.startTime > now)
+              continue; // future program
+            const bool isOngoing = (entry.endTime > now);
+            if (isOngoing && !settings.enablePlayFromStart)
+              continue;
+
+            // Must be within archive window
+            if (entry.endTime < archiveWindowStart)
+              continue;
+
+            const std::string recId = BuildCatchupRecordingId(
+                static_cast<unsigned int>(matchedStream->id),
+                entry.startTime, entry.endTime);
+
+            kodi::addon::PVRRecording rec;
+            rec.SetRecordingId(recId);
+            rec.SetTitle(entry.title.empty() ? "Unknown" : entry.title);
+            rec.SetEpisodeName(entry.episodeName);
+            rec.SetPlot(entry.description);
+            rec.SetRecordingTime(entry.startTime);
+            const int duration = static_cast<int>(
+                (isOngoing ? now : entry.endTime) - entry.startTime);
+            rec.SetDuration(duration > 0 ? duration : 0);
+            rec.SetChannelUid(static_cast<int>(matchedStream->id));
+            rec.SetChannelName(matchedStream->name);
+            rec.SetDirectory("Catchup/" + matchedStream->name);
+            rec.SetGenreType(entry.genreType);
+            rec.SetGenreSubType(entry.genreSubType);
+            if (entry.seasonNumber >= 0)
+              rec.SetSeriesNumber(entry.seasonNumber);
+            if (entry.episodeNumber >= 0)
+              rec.SetEpisodeNumber(entry.episodeNumber);
+
+            // Artwork: prefer EPG icon, fall back to channel icon
+            const std::string& icon =
+                entry.iconPath.empty() ? matchedStream->icon : entry.iconPath;
+            if (!icon.empty())
+            {
+              rec.SetIconPath(icon);
+              rec.SetThumbnailPath(icon);
+            }
+
+            results.Add(rec);
+            ++catchupCount;
+          }
+
+          if (catchupCount >= kMaxCatchupRecordings)
+          {
+            kodi::Log(ADDON_LOG_INFO,
+                      "pvr.dispatcharr: catchup recordings cap (%zu) reached",
+                      kMaxCatchupRecordings);
+            break;
+          }
+        }
+
+        kodi::Log(ADDON_LOG_INFO,
+                  "pvr.dispatcharr: added %zu catchup pseudo-recordings", catchupCount);
+      }
     }
+    // ---- End catchup pseudo-recordings ----
+
     return PVR_ERROR_NO_ERROR;
   }
 
   PVR_ERROR DeleteRecording(const kodi::addon::PVRRecording& recording) override
   {
+      const std::string recId = recording.GetRecordingId();
+
+      // Catchup pseudo-recordings cannot be deleted
+      if (recId.rfind("catchup:", 0) == 0)
+        return PVR_ERROR_NOT_IMPLEMENTED;
+
       if (!m_dispatcharrClient) return PVR_ERROR_SERVER_ERROR;
       try {
-        int id = std::stoi(recording.GetRecordingId());
+        int id = std::stoi(recId);
         if (m_dispatcharrClient->DeleteRecording(id))
             return PVR_ERROR_NO_ERROR;
       } catch (...) {}
@@ -555,6 +709,27 @@ public:
       const kodi::addon::PVRRecording& recording,
       std::vector<kodi::addon::PVRStreamProperty>& properties) override
   {
+    const std::string recordingId = recording.GetRecordingId();
+
+    // ---- Catchup pseudo-recordings: delegate to GetEPGTagStreamProperties ----
+    unsigned int catchupChannelUid = 0;
+    time_t catchupStart = 0, catchupEnd = 0;
+    if (ParseCatchupRecordingId(recordingId, catchupChannelUid, catchupStart, catchupEnd))
+    {
+      kodi::Log(ADDON_LOG_INFO,
+                "pvr.dispatcharr: catchup recording playback: channel=%u start=%lld end=%lld",
+                catchupChannelUid,
+                static_cast<long long>(catchupStart),
+                static_cast<long long>(catchupEnd));
+
+      kodi::addon::PVREPGTag tag;
+      tag.SetUniqueChannelId(catchupChannelUid);
+      tag.SetStartTime(catchupStart);
+      tag.SetEndTime(catchupEnd);
+      return GetEPGTagStreamProperties(tag, properties);
+    }
+    // ---- End catchup delegation ----
+
     // Return the stream URL for playback.
     // The Dispatcharr /api/channels/recordings/{id}/file/ endpoint allows anonymous access,
     // so we can simply provide the URL directly without auth headers.
@@ -569,7 +744,6 @@ public:
       return PVR_ERROR_SERVER_ERROR;
     }
 
-    const std::string recordingId = recording.GetRecordingId();
     for (const auto& r : recordings)
     {
       if (std::to_string(r.id) == recordingId)
@@ -2169,6 +2343,14 @@ private:
         // Always refresh groups after reload so Kodi drops stale groups/members.
         TriggerChannelUpdate();
         TriggerChannelGroupsUpdate();
+
+        // Refresh recordings list if catchup-as-recordings is enabled
+        // so new EPG entries appear as pseudo-recordings.
+        {
+          std::lock_guard<std::mutex> lock(m_mutex);
+          if (m_xtreamSettings.showCatchupRecordings)
+            TriggerRecordingUpdate();
+        }
       }
     });
   }
@@ -2457,6 +2639,8 @@ public:
       m_cachedSettings.enableUserAgentSpoofing = settingValue.GetBoolean();
     else if (settingName == "custom_user_agent")
       m_cachedSettings.customUserAgent = settingValue.GetString();
+    else if (settingName == "show_catchup_recordings")
+      m_cachedSettings.showCatchupRecordings = settingValue.GetBoolean();
 
     m_hasCachedSettings = true;
 
@@ -2478,6 +2662,13 @@ public:
                   settingName.c_str());
         m_pvrClient->TriggerKodiRefreshThrottled();
       }
+    }
+
+    // Toggling catchup-as-recordings should refresh the recordings list immediately.
+    if (settingName == "show_catchup_recordings" && m_pvrClient)
+    {
+      kodi::Log(ADDON_LOG_INFO, "pvr.dispatcharr: show_catchup_recordings toggled -> trigger recording update");
+      m_pvrClient->TriggerRecordingUpdate();
     }
 
     // Other settings will be applied lazily on next PVR callback.

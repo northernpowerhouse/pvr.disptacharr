@@ -118,6 +118,11 @@
           <default>false</default>
           <control type="toggle" />
         </setting>
+        <setting id="show_catchup_recordings" type="boolean" label="30407" help="">
+          <level>0</level>
+          <default>false</default>
+          <control type="toggle" />
+        </setting>
       </group>
     </category>
 

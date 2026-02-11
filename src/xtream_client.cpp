@@ -826,6 +826,7 @@ Settings LoadSettings()
   kodi::addon::GetSettingString("custom_user_agent", s.customUserAgent);
   kodi::addon::GetSettingBoolean("enable_play_from_start", s.enablePlayFromStart);
   kodi::addon::GetSettingBoolean("use_ffmpegdirect", s.useFFmpegDirect);
+  kodi::addon::GetSettingBoolean("show_catchup_recordings", s.showCatchupRecordings);
 
   // Kodi sometimes doesn't transfer settings to binary addons early during startup.
   // Always read persisted settings.xml from addon_data and overlay any values found.
@@ -850,6 +851,7 @@ Settings LoadSettings()
         s.customUserAgent = tmp;
       ExtractSettingBool(xml, "enable_play_from_start", s.enablePlayFromStart);
       ExtractSettingBool(xml, "use_ffmpegdirect", s.useFFmpegDirect);
+      ExtractSettingBool(xml, "show_catchup_recordings", s.showCatchupRecordings);
     }
   }
   return s;
