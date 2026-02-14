@@ -107,3 +107,11 @@ msgctxt "#30407"
 msgid "Show catchup programs as recordings"
 msgstr "Mostrar programas catchup como gravações"
 
+msgctxt "#30408"
+msgid "Maximum catchup recordings"
+msgstr "Máximo de gravações catchup"
+
+msgctxt "#30500"
+msgid "Catchup"
+msgstr "Catchup"
+

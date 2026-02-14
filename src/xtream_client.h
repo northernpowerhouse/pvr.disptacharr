@@ -23,6 +23,7 @@ struct Settings
   bool enablePlayFromStart = true;
   bool useFFmpegDirect = false;
   bool showCatchupRecordings = false;
+  int maxCatchupRecordings = 5000;
 };
 
 struct TestResult

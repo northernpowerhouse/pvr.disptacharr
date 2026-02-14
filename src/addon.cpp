@@ -471,6 +471,9 @@ public:
     EnsureLoaded();
   }
 
+  // Exposed so CXtreamCodesAddon can trigger a cache rebuild from settings changes.
+  void RebuildCatchupCachePublic() { RebuildCatchupCache(); }
+
   PVR_ERROR GetBackendName(std::string& name) override
   {
     name = "Dispatcharr PVR Backend";
@@ -571,116 +574,46 @@ public:
       }
     }
 
-    // ---- Catchup pseudo-recordings ----
+    // ---- Catchup pseudo-recordings (from pre-built cache) ----
     {
-      bool showCatchup = false;
-      std::shared_ptr<const std::vector<xtream::ChannelEpg>> epgData;
-      std::shared_ptr<const std::vector<xtream::LiveStream>> streams;
-      xtream::Settings settings;
+      std::shared_ptr<const std::vector<CachedCatchupRecording>> cached;
       {
         std::lock_guard<std::mutex> lock(m_mutex);
-        settings = m_xtreamSettings;
-        showCatchup = settings.showCatchupRecordings;
-        epgData = m_epgData;
-        streams = m_streams;
+        cached = m_catchupRecordings;
       }
 
-      if (showCatchup && epgData && streams)
+      if (cached)
       {
-        const time_t now = std::time(nullptr);
-        constexpr size_t kMaxCatchupRecordings = 5000;
-        size_t catchupCount = 0;
-
-        // Build a quick lookup: stream id -> LiveStream
-        std::unordered_map<int, const xtream::LiveStream*> streamById;
-        for (const auto& st : *streams)
-          streamById[st.id] = &st;
-
-        for (const auto& chEpg : *epgData)
+        for (const auto& cr : *cached)
         {
-          // Find matching stream by channel ID
-          const xtream::LiveStream* matchedStream = nullptr;
-          for (const auto& st : *streams)
+          kodi::addon::PVRRecording rec;
+          rec.SetRecordingId(cr.recordingId);
+          rec.SetTitle(cr.title);
+          rec.SetEpisodeName(cr.episodeName);
+          rec.SetPlot(cr.plot);
+          rec.SetRecordingTime(cr.recordingTime);
+          rec.SetDuration(cr.duration);
+          rec.SetChannelUid(cr.channelUid);
+          rec.SetChannelName(cr.channelName);
+          rec.SetDirectory(cr.directory);
+          rec.SetGenreType(cr.genreType);
+          rec.SetGenreSubType(cr.genreSubType);
+          if (cr.seasonNumber >= 0)
+            rec.SetSeriesNumber(cr.seasonNumber);
+          if (cr.episodeNumber >= 0)
+            rec.SetEpisodeNumber(cr.episodeNumber);
+          if (cr.epgEventId != 0)
+            rec.SetEPGEventId(cr.epgEventId);
+          if (!cr.iconPath.empty())
           {
-            if (std::to_string(st.id) == chEpg.id || st.epgChannelId == chEpg.id)
-            {
-              matchedStream = &st;
-              break;
-            }
+            rec.SetIconPath(cr.iconPath);
+            rec.SetThumbnailPath(cr.iconPath);
           }
-          if (!matchedStream)
-            continue;
-
-          // Channel must support catchup
-          if (!matchedStream->tvArchive || matchedStream->tvArchiveDuration <= 0)
-            continue;
-
-          const time_t archiveWindowStart =
-              now - static_cast<time_t>(matchedStream->tvArchiveDuration) * 86400;
-
-          for (const auto& [startKey, entry] : chEpg.entries)
-          {
-            if (catchupCount >= kMaxCatchupRecordings)
-              break;
-
-            // Must have ended (or be ongoing with play-from-start enabled)
-            if (entry.startTime > now)
-              continue; // future program
-            const bool isOngoing = (entry.endTime > now);
-            if (isOngoing && !settings.enablePlayFromStart)
-              continue;
-
-            // Must be within archive window
-            if (entry.endTime < archiveWindowStart)
-              continue;
-
-            const std::string recId = BuildCatchupRecordingId(
-                static_cast<unsigned int>(matchedStream->id),
-                entry.startTime, entry.endTime);
-
-            kodi::addon::PVRRecording rec;
-            rec.SetRecordingId(recId);
-            rec.SetTitle(entry.title.empty() ? "Unknown" : entry.title);
-            rec.SetEpisodeName(entry.episodeName);
-            rec.SetPlot(entry.description);
-            rec.SetRecordingTime(entry.startTime);
-            const int duration = static_cast<int>(
-                (isOngoing ? now : entry.endTime) - entry.startTime);
-            rec.SetDuration(duration > 0 ? duration : 0);
-            rec.SetChannelUid(static_cast<int>(matchedStream->id));
-            rec.SetChannelName(matchedStream->name);
-            rec.SetDirectory("Catchup/" + matchedStream->name);
-            rec.SetGenreType(entry.genreType);
-            rec.SetGenreSubType(entry.genreSubType);
-            if (entry.seasonNumber >= 0)
-              rec.SetSeriesNumber(entry.seasonNumber);
-            if (entry.episodeNumber >= 0)
-              rec.SetEpisodeNumber(entry.episodeNumber);
-
-            // Artwork: prefer EPG icon, fall back to channel icon
-            const std::string& icon =
-                entry.iconPath.empty() ? matchedStream->icon : entry.iconPath;
-            if (!icon.empty())
-            {
-              rec.SetIconPath(icon);
-              rec.SetThumbnailPath(icon);
-            }
-
-            results.Add(rec);
-            ++catchupCount;
-          }
-
-          if (catchupCount >= kMaxCatchupRecordings)
-          {
-            kodi::Log(ADDON_LOG_INFO,
-                      "pvr.dispatcharr: catchup recordings cap (%zu) reached",
-                      kMaxCatchupRecordings);
-            break;
-          }
+          results.Add(rec);
         }
-
         kodi::Log(ADDON_LOG_INFO,
-                  "pvr.dispatcharr: added %zu catchup pseudo-recordings", catchupCount);
+                  "pvr.dispatcharr: served %zu catchup pseudo-recordings from cache",
+                  cached->size());
       }
     }
     // ---- End catchup pseudo-recordings ----
@@ -1906,6 +1839,125 @@ private:
 
     (void)WriteStringToFileAtomic(path, blob);
   }
+
+  // Build (or clear) the catchup pseudo-recordings cache from current EPG + stream data.
+  // Shows user-visible notifications for each stage. Safe to call from any thread.
+  void RebuildCatchupCache()
+  {
+    bool showCatchup = false;
+    std::shared_ptr<const std::vector<xtream::ChannelEpg>> epgData;
+    std::shared_ptr<const std::vector<xtream::LiveStream>> streams;
+    xtream::Settings settings;
+    {
+      std::lock_guard<std::mutex> lock(m_mutex);
+      settings = m_xtreamSettings;
+      showCatchup = settings.showCatchupRecordings;
+      epgData = m_epgData;
+      streams = m_streams;
+    }
+
+    if (!showCatchup || !epgData || !streams)
+    {
+      // Clear cache if disabled
+      std::lock_guard<std::mutex> lock(m_mutex);
+      m_catchupRecordings.reset();
+      return;
+    }
+
+    kodi::QueueNotification(QUEUE_INFO, ADDON_NAME, "Scanning for catchup programs...");
+
+    const time_t now = std::time(nullptr);
+    const size_t maxCatchupRec = (settings.maxCatchupRecordings > 0)
+        ? static_cast<size_t>(settings.maxCatchupRecordings) : 5000u;
+
+    auto result = std::make_shared<std::vector<CachedCatchupRecording>>();
+    result->reserve(std::min(maxCatchupRec, static_cast<size_t>(10000)));
+
+    for (const auto& chEpg : *epgData)
+    {
+      // Find matching stream by channel ID
+      const xtream::LiveStream* matchedStream = nullptr;
+      for (const auto& st : *streams)
+      {
+        if (std::to_string(st.id) == chEpg.id || st.epgChannelId == chEpg.id)
+        {
+          matchedStream = &st;
+          break;
+        }
+      }
+      if (!matchedStream)
+        continue;
+
+      // Channel must support catchup
+      if (!matchedStream->tvArchive || matchedStream->tvArchiveDuration <= 0)
+        continue;
+
+      const time_t archiveWindowStart =
+          now - static_cast<time_t>(matchedStream->tvArchiveDuration) * 86400;
+
+      for (const auto& [startKey, entry] : chEpg.entries)
+      {
+        if (result->size() >= maxCatchupRec)
+          break;
+
+        // Must have ended (or be ongoing with play-from-start enabled)
+        if (entry.startTime > now)
+          continue;
+        const bool isOngoing = (entry.endTime > now);
+        if (isOngoing && !settings.enablePlayFromStart)
+          continue;
+
+        // Must be within archive window
+        if (entry.endTime < archiveWindowStart)
+          continue;
+
+        CachedCatchupRecording cr;
+        cr.recordingId = BuildCatchupRecordingId(
+            static_cast<unsigned int>(matchedStream->id),
+            entry.startTime, entry.endTime);
+        cr.title = entry.title.empty() ? "Unknown" : entry.title;
+        cr.episodeName = entry.episodeName;
+        cr.plot = entry.description;
+        cr.recordingTime = entry.startTime;
+        const int duration = static_cast<int>(
+            (isOngoing ? now : entry.endTime) - entry.startTime);
+        cr.duration = duration > 0 ? duration : 0;
+        cr.channelUid = static_cast<int>(matchedStream->id);
+        cr.channelName = matchedStream->name;
+        cr.directory = "Catchup/" + matchedStream->name;
+        cr.genreType = entry.genreType;
+        cr.genreSubType = entry.genreSubType;
+        cr.seasonNumber = entry.seasonNumber;
+        cr.episodeNumber = entry.episodeNumber;
+        cr.epgEventId = static_cast<unsigned int>(entry.startTime);
+
+        // Artwork: prefer EPG icon, fall back to channel icon
+        cr.iconPath = entry.iconPath.empty() ? matchedStream->icon : entry.iconPath;
+
+        result->push_back(std::move(cr));
+      }
+
+      if (result->size() >= maxCatchupRec)
+      {
+        kodi::Log(ADDON_LOG_INFO,
+                  "pvr.dispatcharr: catchup recordings cap (%zu) reached", maxCatchupRec);
+        break;
+      }
+    }
+
+    const size_t count = result->size();
+    {
+      std::lock_guard<std::mutex> lock(m_mutex);
+      m_catchupRecordings = std::move(result);
+    }
+
+    kodi::Log(ADDON_LOG_INFO,
+              "pvr.dispatcharr: built %zu catchup pseudo-recordings", count);
+
+    const std::string msg = "Created " + std::to_string(count) + " catchup recordings";
+    kodi::QueueNotification(QUEUE_INFO, ADDON_NAME, msg.c_str());
+  }
+
   void StartWorkerThread()
   {
     bool shouldStart = false;
@@ -2304,11 +2356,13 @@ private:
         }
 
         // Load EPG data from XMLTV endpoint
+        kodi::QueueNotification(QUEUE_INFO, ADDON_NAME, "Fetching EPG data...");
         std::string xmltvData;
         const xtream::FetchResult epgResult = xtream::FetchXMLTVEpg(settings, xmltvData);
         if (epgResult.ok)
         {
           kodi::Log(ADDON_LOG_INFO, "pvr.dispatcharr: fetched XMLTV EPG data");
+          kodi::QueueNotification(QUEUE_INFO, ADDON_NAME, "Parsing EPG data...");
           std::vector<xtream::ChannelEpg> epgData;
           if (xtream::ParseXMLTV(xmltvData, streams, epgData))
           {
@@ -2317,16 +2371,22 @@ private:
             
             kodi::Log(ADDON_LOG_INFO, "pvr.dispatcharr: loaded EPG for %zu channels",
                       m_epgData ? m_epgData->size() : 0u);
+
+            const std::string epgMsg = "EPG loaded for " +
+                std::to_string(m_epgData->size()) + " channels";
+            kodi::QueueNotification(QUEUE_INFO, ADDON_NAME, epgMsg.c_str());
           }
           else
           {
             kodi::Log(ADDON_LOG_WARNING, "pvr.dispatcharr: failed to parse XMLTV data");
+            kodi::QueueNotification(QUEUE_WARNING, ADDON_NAME, "Failed to parse EPG data");
           }
         }
         else
         {
           kodi::Log(ADDON_LOG_WARNING, "pvr.dispatcharr: failed to fetch XMLTV EPG data: %s", 
                     epgResult.details.c_str());
+          kodi::QueueNotification(QUEUE_WARNING, ADDON_NAME, "Failed to fetch EPG data");
         }
 
         kodi::Log(ADDON_LOG_INFO,
@@ -2344,12 +2404,18 @@ private:
         TriggerChannelUpdate();
         TriggerChannelGroupsUpdate();
 
-        // Refresh recordings list if catchup-as-recordings is enabled
-        // so new EPG entries appear as pseudo-recordings.
+        // Build catchup pseudo-recordings cache if enabled
         {
-          std::lock_guard<std::mutex> lock(m_mutex);
-          if (m_xtreamSettings.showCatchupRecordings)
+          bool doCatchup = false;
+          {
+            std::lock_guard<std::mutex> lock(m_mutex);
+            doCatchup = m_xtreamSettings.showCatchupRecordings;
+          }
+          if (doCatchup)
+          {
+            RebuildCatchupCache();
             TriggerRecordingUpdate();
+          }
         }
       }
     });
@@ -2571,6 +2637,27 @@ private:
   std::shared_ptr<const std::vector<xtream::ChannelEpg>> m_epgData;
   std::shared_ptr<const std::vector<xtream::LiveStream>> m_streams;
 
+  // Pre-computed catchup pseudo-recordings cache
+  struct CachedCatchupRecording
+  {
+    std::string recordingId;
+    std::string title;
+    std::string episodeName;
+    std::string plot;
+    time_t recordingTime = 0;
+    int duration = 0;
+    int channelUid = 0;
+    std::string channelName;
+    std::string directory;
+    int genreType = 0;
+    int genreSubType = 0;
+    int seasonNumber = -1;
+    int episodeNumber = -1;
+    unsigned int epgEventId = 0;
+    std::string iconPath;
+  };
+  std::shared_ptr<const std::vector<CachedCatchupRecording>> m_catchupRecordings;
+
   // Catchup playback state - set by GetEPGTagStreamProperties, consumed by GetChannelStreamProperties
   struct PendingCatchup
   {
@@ -2641,6 +2728,8 @@ public:
       m_cachedSettings.customUserAgent = settingValue.GetString();
     else if (settingName == "show_catchup_recordings")
       m_cachedSettings.showCatchupRecordings = settingValue.GetBoolean();
+    else if (settingName == "max_catchup_recordings")
+      m_cachedSettings.maxCatchupRecordings = settingValue.GetInt();
 
     m_hasCachedSettings = true;
 
@@ -2664,10 +2753,12 @@ public:
       }
     }
 
-    // Toggling catchup-as-recordings should refresh the recordings list immediately.
-    if (settingName == "show_catchup_recordings" && m_pvrClient)
+    // Toggling catchup-as-recordings should rebuild cache and refresh the recordings list.
+    if ((settingName == "show_catchup_recordings" || settingName == "max_catchup_recordings") && m_pvrClient)
     {
-      kodi::Log(ADDON_LOG_INFO, "pvr.dispatcharr: show_catchup_recordings toggled -> trigger recording update");
+      kodi::Log(ADDON_LOG_INFO, "pvr.dispatcharr: catchup setting changed (%s) -> rebuild cache",
+                settingName.c_str());
+      m_pvrClient->RebuildCatchupCachePublic();
       m_pvrClient->TriggerRecordingUpdate();
     }
 
